@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Models / weights (never commit GGUF or HF caches)
+*.gguf
+*.safetensors
+*.bin
+models/
+.cache/
+hf_cache/
+
+# Modal
+.modal.toml
+
+# Gradio / app
+flagged/
+*.log
+gradio_cached_examples/
+
+# Agent traces (publish to Hub instead of committing raw)
+traces/*.jsonl
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

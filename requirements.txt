@@ -1,0 +1,7 @@
+# HF Space (Gradio) runtime
+gradio>=5.0
+openai>=1.30          # OpenAI-compatible client -> Modal vLLM / llama.cpp endpoints
+httpx>=0.27
+pydantic>=2.7
+python-dotenv>=1.0
+huggingface_hub>=0.24 # trace upload (Open trace badge)
