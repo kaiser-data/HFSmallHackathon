@@ -11,16 +11,17 @@ import os
 import modal
 
 # --- pick your specialist; must keep TOTAL (all agents) <= 32B params ---
-MODEL_NAME = os.environ.get("VLLM_MODEL", "Qwen/Qwen3.5-27B-Instruct")
+# Qwen3.5-27B in FP8 (~27GB) + the 1B MiniCPM router = 28B total, fits 1xA100-40GB.
+MODEL_NAME = os.environ.get("VLLM_MODEL", "Qwen/Qwen3.5-27B-FP8")
 MODEL_REVISION = os.environ.get("VLLM_REVISION", "main")
-GPU = os.environ.get("VLLM_GPU", "A100-40GB")  # H100/A100; 27B fits 1xA100-40/80
+GPU = os.environ.get("VLLM_GPU", "A100-40GB")  # FP8 27B weights ~27GB; fits 40GB w/ KV cache
 API_KEY = os.environ.get("VLLM_API_KEY", "local-dev-key")  # gate the endpoint
 
 app = modal.App("small-hack-vllm")
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
-    .pip_install("vllm>=0.6.0", "huggingface_hub[hf_transfer]>=0.24")
+    .pip_install("vllm>=0.22.0", "huggingface_hub[hf_transfer]>=0.24")  # current vLLM for Qwen3.5 arch
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
 )
 
@@ -41,13 +42,14 @@ hf_cache = modal.Volume.from_name("hf-cache", create_if_missing=True)
 def serve():
     import subprocess
 
+    # The app uses plain chat completions + JSON-in-text (loose_json), never the
+    # tools API — so no --enable-auto-tool-choice / --tool-call-parser here; they
+    # add a model-template dependency for a feature we don't use.
     cmd = [
         "vllm", "serve", MODEL_NAME,
         "--revision", MODEL_REVISION,
         "--host", "0.0.0.0", "--port", "8000",
         "--api-key", API_KEY,
         "--max-model-len", os.environ.get("VLLM_MAX_LEN", "16384"),
-        "--enable-auto-tool-choice",
-        "--tool-call-parser", os.environ.get("VLLM_TOOL_PARSER", "hermes"),
     ]
     subprocess.Popen(" ".join(cmd), shell=True)

@@ -11,7 +11,7 @@ import modal
 
 # a small GGUF repo + the specific quantized file inside it
 GGUF_REPO = os.environ.get("GGUF_REPO", "openbmb/MiniCPM5-1B-GGUF")
-GGUF_FILE = os.environ.get("GGUF_FILE", "minicpm5-1b-q4_k_m.gguf")
+GGUF_FILE = os.environ.get("GGUF_FILE", "MiniCPM5-1B-Q4_K_M.gguf")  # exact case as on HF
 GPU = os.environ.get("LLAMACPP_GPU", "T4")  # 1B quantized is tiny; T4 is plenty
 API_KEY = os.environ.get("LLAMACPP_API_KEY", "local-dev-key")
 

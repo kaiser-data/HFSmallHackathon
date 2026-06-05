@@ -11,7 +11,7 @@ from openai import OpenAI
 # --- backends: filled from Space secrets / .env ---
 VLLM_BASE_URL = os.environ.get("MODAL_VLLM_BASE_URL", "http://localhost:8000/v1")
 VLLM_API_KEY = os.environ.get("MODAL_VLLM_API_KEY", "local-dev-key")
-VLLM_MODEL = os.environ.get("MODAL_VLLM_MODEL", "Qwen/Qwen3.5-27B-Instruct")
+VLLM_MODEL = os.environ.get("MODAL_VLLM_MODEL", "Qwen/Qwen3.5-27B-FP8")
 
 LLAMACPP_BASE_URL = os.environ.get("MODAL_LLAMACPP_BASE_URL", "http://localhost:8080/v1")
 LLAMACPP_API_KEY = os.environ.get("MODAL_LLAMACPP_API_KEY", "local-dev-key")

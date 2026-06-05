@@ -1,0 +1,4 @@
+# Deploy-time only — NOT needed by the HF Space runtime (which only calls the
+# endpoints via the openai client). Install locally to deploy the Modal GPU
+# endpoints:  pip install -r requirements-deploy.txt
+modal>=1.4            # modal deploy modal_app/vllm_server.py  (and llamacpp_server.py)
