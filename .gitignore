@@ -31,3 +31,4 @@ traces/*.jsonl
 .DS_Store
 .idea/
 .vscode/
+graphify-out/
