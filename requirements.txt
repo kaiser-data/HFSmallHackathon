@@ -1,5 +1,5 @@
 # HF Space (Gradio) runtime
-gradio>=5.0
+gradio>=6.0          # v6 API: messages-format Chatbot, theme/css on launch()
 openai>=1.30          # OpenAI-compatible client -> Modal vLLM / llama.cpp endpoints
 httpx>=0.27
 pydantic>=2.7

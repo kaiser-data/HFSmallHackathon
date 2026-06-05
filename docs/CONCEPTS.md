@@ -53,3 +53,10 @@ Mischief agent that injects surprises. You wander a procedurally-described wood.
 **Pitch A (The Council)** for the cleanest delight-per-effort and the best multiagent
 justification, with **Pitch B** as the pivot if you have a willing real user (better cash-prize
 odds, since Backyard's bar is "they actually used it"). Both reuse the same orchestration code.
+
+---
+
+## ✅ Chosen direction: DAYDREAM
+After exploring real-problem and funny fleets, we converged on a **dreamlike,
+game-like fleet** (Calvin-&-Hobbes energy): a companion + shifting environments +
+light mission, where dream-logic forgives small-model quirks. See README.

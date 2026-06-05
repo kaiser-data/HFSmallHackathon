@@ -1,57 +1,63 @@
-# Small Hackathon — Multiagent on Modal 🍄⚖️
+# 🌙 DAYDREAM — wander dreamlike worlds with a fleet of small models
 
-A multiagent system built for the **Small Hackathon** (Gradio · Hugging Face).
-Small models (≤32B total), Gradio frontend on a HF Space, agent inference on **Modal**.
+Built for the **Small Hackathon** (Gradio · Hugging Face). Track: *An Adventure in
+Thousand Token Wood*. You + an AI companion (**Hobbes**) drift through dreamlike
+environments conjured live by a **fleet of small-model agents**. You steer with a
+word; Hobbes reacts and escalates the big choices. Light mission + free wander.
 
-> Default build: **"The Council"** (Thousand Token Wood track) — a council of tiny
-> specialist agents debates your question live and hands down a screenshot-able verdict.
-> See [`docs/CONCEPTS.md`](docs/CONCEPTS.md) for all three pitches.
+> **The thesis:** you don't own one giant brain — you command a *fleet of scrappy
+> small minds*. And in a dream, a small model's fuzziness isn't a bug, it's the
+> aesthetic. **The constraint is the art.** ≤32B total, by design.
 
-## Architecture
+## How it plays
+1. Pick a world (Candy Desert, Sunken City, Rain Street, Red Planet, Thousand Token Wood).
+2. The **Dreamweaver** narrates; **Mischief** bends the rules; **Hobbes** reacts and
+   offers 2–3 choices (or type your own intent).
+3. A tiny **Keeper** agent tracks externalized world-state (location, inventory,
+   mission progress) so the small models stay coherent. Reach the dream's resolution — or just wander.
 
-```
-HF Space (Gradio)  ──OpenAI API──▶  Modal vLLM   (Qwen3.5-27B specialist voices)
-   app/app.py                       Modal llama.cpp (MiniCPM5-1B router/chair)
-        │
-        ▼
-   agents/  ── base.Agent · orchestrator.Council · registry (role→backend)
-```
+## The fleet (agent-first)
+| Agent | Role | Backend | Job |
+|---|---|---|---|
+| 🌌 Dreamweaver | specialist | Modal vLLM (Qwen3.5-27B) | narrate the world |
+| 🃏 Mischief | specialist | Modal vLLM | inject surreal twists |
+| 🐯 Hobbes | specialist | Modal vLLM | companion + escalate choices |
+| 🗺 Keeper | router | Modal llama.cpp (MiniCPM5-1B) | structured world-state updates |
 
-Both backends are OpenAI-compatible, so swapping models or running "Off the Grid"
-is a config change, not a code change.
+Backends are OpenAI-compatible → swap models or go "Off the Grid" via env, no code change.
 
-## Bonus badges in reach
-- 🦙 **Llama Champion** — router served via llama.cpp on Modal
-- 📡 **Open trace** — publish agent traces to the Hub
-- 🎨 **Off-Brand** — custom Gradio theme/UI
-- 📓 **Field Notes** — write-up of what we learned
-- OpenBMB special prize — MiniCPM5-1B as the tiny router
-
-## Quickstart
-
+## Quickstart (offline, no backend)
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env          # fill in Modal URLs/keys after deploy
+DAYDREAM_MOCK=1 python app/app.py      # fully playable with templated agents
+```
 
-# 1) deploy inference on Modal
+## Run against Modal inference
+```bash
 pip install modal && modal token new
-modal deploy modal_app/vllm_server.py        # prints the specialist URL
-modal deploy modal_app/llamacpp_server.py    # prints the router URL  (Llama badge)
-
-# 2) run the Gradio app locally against those endpoints
+modal deploy modal_app/vllm_server.py       # Dreamweaver / Mischief / Hobbes
+modal deploy modal_app/llamacpp_server.py   # Keeper (Llama Champion badge 🦙)
+cp .env.example .env                         # paste the printed URLs/keys
 python app/app.py
 ```
 
 ## Deploy as a HF Space
-Symlink `app/app.py` to `app.py` at repo root, push to a Space, and set the
-`MODAL_*` secrets from `.env.example`. `requirements.txt` is Space-ready.
+Symlink `app/app.py` → `app.py` at repo root, push to a Space, set the `MODAL_*`
+secrets from `.env.example`. `requirements.txt` is Space-ready.
+
+## Bonus badges in reach
+🦙 **Llama Champion** (Keeper via llama.cpp) · 🎨 **Off-Brand** (dream UI) ·
+📡 **Open trace** (share a dream run) · 📓 **Field Notes** · MiniCPM5-1B → OpenBMB prize.
+**Stretch:** doodle→dream via MiniCPM-V vision.
 
 ## Layout
 | Path | What |
 |---|---|
-| `modal_app/vllm_server.py` | Modal GPU vLLM endpoint (big specialist) |
-| `modal_app/llamacpp_server.py` | Modal llama.cpp GGUF endpoint (tiny router) |
-| `agents/` | Agent base, Council orchestrator, backend registry |
-| `app/app.py` | Gradio Space entrypoint |
-| `docs/CONCEPTS.md` | The three concept pitches + recommendation |
+| `agents/dream.py` | DAYDREAM fleet engine (Dreamweaver · Mischief · Hobbes · Keeper) |
+| `agents/world.py` | Environments (Mission skins) + externalized `WorldState` |
+| `agents/base.py` | Tiny streaming/JSON Agent + `DAYDREAM_MOCK` offline mode |
+| `agents/registry.py` | role→backend map (OpenAI-compatible) |
+| `app/app.py` | Gradio command-deck UI |
+| `modal_app/*.py` | Modal vLLM + llama.cpp inference endpoints |
+| `docs/CONCEPTS.md` | concept exploration that led here |

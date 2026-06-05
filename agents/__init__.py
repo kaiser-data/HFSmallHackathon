@@ -1,5 +1,9 @@
 from .base import Agent, LLMConfig
 from .registry import REGISTRY, get_client
-from .orchestrator import Council
+from .world import ENVIRONMENTS, Environment, WorldState
+from .dream import DreamEngine
 
-__all__ = ["Agent", "LLMConfig", "REGISTRY", "get_client", "Council"]
+__all__ = [
+    "Agent", "LLMConfig", "REGISTRY", "get_client",
+    "ENVIRONMENTS", "Environment", "WorldState", "DreamEngine",
+]
