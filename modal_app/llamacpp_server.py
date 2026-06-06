@@ -14,6 +14,9 @@ GGUF_REPO = os.environ.get("GGUF_REPO", "openbmb/MiniCPM5-1B-GGUF")
 GGUF_FILE = os.environ.get("GGUF_FILE", "MiniCPM5-1B-Q4_K_M.gguf")  # exact case as on HF
 GPU = os.environ.get("LLAMACPP_GPU", "T4")  # 1B quantized is tiny; T4 is plenty
 API_KEY = os.environ.get("LLAMACPP_API_KEY", "local-dev-key")
+# Set MODAL_MIN_CONTAINERS=1 before a live demo to pin one warm container and
+# avoid the "Loading model" 503 on a scaled-down endpoint; leave 0 otherwise.
+MIN_CONTAINERS = int(os.environ.get("MODAL_MIN_CONTAINERS", "0"))
 
 app = modal.App("small-hack-llamacpp")
 
@@ -35,6 +38,7 @@ hf_cache = modal.Volume.from_name("hf-cache", create_if_missing=True)
     volumes={"/root/.cache/huggingface": hf_cache},
     secrets=[modal.Secret.from_dict({"HF_TOKEN": os.environ.get("HF_TOKEN", "")})],
     scaledown_window=300,
+    min_containers=MIN_CONTAINERS,  # =1 for a demo pins a warm container
     timeout=20 * 60,
 )
 @modal.concurrent(max_inputs=16)

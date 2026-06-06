@@ -16,6 +16,11 @@ MODEL_NAME = os.environ.get("VLLM_MODEL", "Qwen/Qwen3.5-27B-FP8")
 MODEL_REVISION = os.environ.get("VLLM_REVISION", "main")
 GPU = os.environ.get("VLLM_GPU", "A100-40GB")  # FP8 27B weights ~27GB; fits 40GB w/ KV cache
 API_KEY = os.environ.get("VLLM_API_KEY", "local-dev-key")  # gate the endpoint
+# Cold start here is ~145-265s. Set MODAL_MIN_CONTAINERS=1 before a live demo to
+# pin one warm GPU (no cold start mid-stage); leave 0 otherwise to avoid paying
+# for an idle A100. scaledown_window only helps within a 5-min gap — talk longer
+# than that between turns and the container dies, so keep-warm is the real fix.
+MIN_CONTAINERS = int(os.environ.get("MODAL_MIN_CONTAINERS", "0"))
 
 app = modal.App("small-hack-vllm")
 
@@ -43,6 +48,7 @@ hf_cache = modal.Volume.from_name("hf-cache", create_if_missing=True)
     volumes={"/root/.cache/huggingface": hf_cache},
     secrets=[modal.Secret.from_dict({"HF_TOKEN": os.environ.get("HF_TOKEN", "")})],
     scaledown_window=300,        # keep warm 5 min between requests
+    min_containers=MIN_CONTAINERS,  # =1 for a demo pins a warm GPU (no cold start)
     timeout=20 * 60,
 )
 @modal.concurrent(max_inputs=32)

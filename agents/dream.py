@@ -20,6 +20,8 @@ Per turn:
 (label, tier) options and `engine.state` reflects the moved world.
 """
 from __future__ import annotations
+import re
+import concurrent.futures
 from dataclasses import dataclass, field
 
 from .base import Agent, LLMConfig
@@ -84,14 +86,17 @@ class DreamEngine:
     gambits: list[tuple[str, str]] = field(default_factory=list)  # [(label, tier), ...]
     last_outcome: Outcome | None = None
 
+    # max_tokens is the dominant lever on warm latency (generation time is ~linear
+    # in tokens, and --enforce-eager decode is unhurried on the 27B). Each cap is
+    # sized to the job: 2-4 sentences of prose, one ominous line, small JSON blobs.
     dreamweaver: Agent = field(default_factory=lambda: Agent(
-        "Dreamweaver", "specialist", DREAMWEAVER_SYS, LLMConfig(0.95, 320)))
+        "Dreamweaver", "specialist", DREAMWEAVER_SYS, LLMConfig(0.95, 180)))
     nightmare: Agent = field(default_factory=lambda: Agent(
-        "Nightmare", "specialist", NIGHTMARE_SYS, LLMConfig(1.0, 90)))
+        "Nightmare", "specialist", NIGHTMARE_SYS, LLMConfig(1.0, 70)))
     hobbes: Agent = field(default_factory=lambda: Agent(
-        "Hobbes", "specialist", HOBBES_SYS, LLMConfig(0.85, 220)))
+        "Hobbes", "specialist", HOBBES_SYS, LLMConfig(0.85, 140)))
     keeper: Agent = field(default_factory=lambda: Agent(
-        "Keeper", "router", KEEPER_SYS, LLMConfig(0.2, 220)))
+        "Keeper", "router", KEEPER_SYS, LLMConfig(0.2, 160)))
 
     # --- lifecycle ---
     def start(self, env_id: str, seed: str = "dream") -> None:
@@ -144,24 +149,32 @@ class DreamEngine:
                 yield "Nightmare", d
             scene += " " + twist
 
-        # 5) Hobbes reacts (voice keyed to courage) + offers the next three gambits
-        if not s.over:
-            h = self.hobbes.json(
-                f"{self._ctx()}\nYOUR MOOD: {MOOD_NOTE[s.mood]}\n"
-                f"The dreamer did: {intent}\nScene: {scene}\nReact and offer three gambits."
-            )
-            reaction = str(h.get("reaction") or "...").strip()
-            ch = h.get("choices")
-            labels = ([c.strip() for c in ch if isinstance(c, str) and c.strip()][:3]
-                      if isinstance(ch, list) else [])
-            self.gambits = self._make_gambits(labels)
-            yield "Hobbes", reaction
-        else:
-            self.gambits = []
-            yield "Hobbes", self.farewell()
+        # 5+6) Hobbes (specialist) and the Keeper (router) both need only the
+        # finished scene, and they live on different backends — so kick the Keeper
+        # off in a thread and let it run *under* the slower Hobbes call instead of
+        # stacking after it. The router (and its cold-start retry variance) thus
+        # costs ~0 on the turn's critical path. Snapshot the Hobbes prompt first so
+        # its state read can't race the Keeper's state write.
+        hobbes_prompt = (f"{self._ctx()}\nYOUR MOOD: {MOOD_NOTE[s.mood]}\n"
+                         f"The dreamer did: {intent}\nScene: {scene}\n"
+                         f"React and offer three gambits.")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            keeper_job = pool.submit(self._update, intent, scene)
 
-        # 6) Keeper updates narrative state (code already owns the game math)
-        self._update(intent, scene)
+            # 5) Hobbes reacts (voice keyed to courage) + offers three gambits
+            if not s.over:
+                h = self.hobbes.json(hobbes_prompt)
+                reaction = str(h.get("reaction") or "...").strip()
+                ch = h.get("choices")
+                labels = ([c.strip() for c in ch if isinstance(c, str) and c.strip()][:3]
+                          if isinstance(ch, list) else [])
+                self.gambits = self._make_gambits(labels)
+                yield "Hobbes", reaction
+            else:
+                self.gambits = []
+                yield "Hobbes", self.farewell()
+
+            keeper_job.result()  # settle the state write before the turn ends
 
     def _make_gambits(self, labels: list[str]) -> list[tuple[str, str]]:
         """Zip the model's words onto code-fixed tiers; fall back per missing slot."""
@@ -179,7 +192,11 @@ class DreamEngine:
         s = self.state
         patch = self.keeper.json(f"{self._ctx()}\nAction: {intent}\nScene: {scene}\nUpdate state.")
         if loc := patch.get("location"):
-            s.location = str(loc)[:80]
+            # The router sometimes echoes the context's "WORLD:"/"LOCATION:" label
+            # back into the value; strip it so the state line doesn't double up.
+            clean = re.sub(r"^\s*(WORLD|LOCATION)\s*:\s*", "", str(loc), flags=re.I).strip()
+            if clean:
+                s.location = clean[:80]
         add = patch.get("add_items")
         for item in (add if isinstance(add, list) else []):
             if isinstance(item, str) and item and item not in s.inventory:
