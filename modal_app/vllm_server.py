@@ -22,7 +22,15 @@ app = modal.App("small-hack-vllm")
 image = (
     modal.Image.debian_slim(python_version="3.11")
     .pip_install("vllm>=0.22.0", "huggingface_hub[hf_transfer]>=0.24")  # current vLLM for Qwen3.5 arch
-    .env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
+    .env({
+        "HF_HUB_ENABLE_HF_TRANSFER": "1",
+        # The slim image has the CUDA runtime but no nvcc. FlashInfer JIT-compiles
+        # a sampler kernel at startup and crashes ("Could not find nvcc"). Force
+        # FlashAttention + the native sampler so nothing needs the CUDA compiler;
+        # the mamba/GDN path already uses Triton (self-compiling).
+        "VLLM_ATTENTION_BACKEND": "FLASH_ATTN",
+        "VLLM_USE_FLASHINFER_SAMPLER": "0",
+    })
 )
 
 # cache weights across cold starts
@@ -51,5 +59,10 @@ def serve():
         "--host", "0.0.0.0", "--port", "8000",
         "--api-key", API_KEY,
         "--max-model-len", os.environ.get("VLLM_MAX_LEN", "16384"),
+        # Skip torch.compile + cudagraph capture: on a 40GB card with 27B FP8
+        # weights already resident, that step is both slow (blew the startup
+        # window) and memory-hungry. Eager start is fast and reliable; the
+        # inference-speed cost is invisible for a turn-based narrative game.
+        "--enforce-eager",
     ]
     subprocess.Popen(" ".join(cmd), shell=True)

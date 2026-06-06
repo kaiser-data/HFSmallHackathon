@@ -19,6 +19,9 @@ app = modal.App("small-hack-llamacpp")
 
 image = (
     modal.Image.from_registry("ghcr.io/ggml-org/llama.cpp:server-cuda", add_python="3.11")
+    # The base image's ENTRYPOINT is /app/llama-server; clear it so Modal can run
+    # its own Python bootstrap (otherwise the binary sees "python" as a bad arg).
+    .entrypoint([])
     .pip_install("huggingface_hub[hf_transfer]>=0.24")
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
 )
