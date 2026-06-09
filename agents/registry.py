@@ -5,15 +5,26 @@ OpenAI-compatible, so the same client code hits Modal vLLM or Modal llama.cpp.
 Configure via env so the HF Space never hardcodes URLs/keys.
 """
 import os
+import sys
+import pathlib
 from functools import lru_cache
 from openai import OpenAI
 
+# Derive URLs from a single MODAL_WORKSPACE slug so a workspace switch (e.g. to the
+# credit workspace) is a one-line .env change, not a code edit. Explicit
+# MODAL_*_BASE_URL still wins if set.
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
+from endpoints import derive as _derive_urls  # noqa: E402
+
+_WS = os.environ.get("MODAL_WORKSPACE", "").strip()
+_URLS = _derive_urls(_WS) if _WS else {}
+
 # --- backends: filled from Space secrets / .env ---
-VLLM_BASE_URL = os.environ.get("MODAL_VLLM_BASE_URL", "http://localhost:8000/v1")
+VLLM_BASE_URL = os.environ.get("MODAL_VLLM_BASE_URL") or _URLS.get("vllm", "http://localhost:8000/v1")
 VLLM_API_KEY = os.environ.get("MODAL_VLLM_API_KEY", "local-dev-key")
 VLLM_MODEL = os.environ.get("MODAL_VLLM_MODEL", "Qwen/Qwen3.5-27B-FP8")
 
-LLAMACPP_BASE_URL = os.environ.get("MODAL_LLAMACPP_BASE_URL", "http://localhost:8080/v1")
+LLAMACPP_BASE_URL = os.environ.get("MODAL_LLAMACPP_BASE_URL") or _URLS.get("llamacpp", "http://localhost:8080/v1")
 LLAMACPP_API_KEY = os.environ.get("MODAL_LLAMACPP_API_KEY", "local-dev-key")
 LLAMACPP_MODEL = os.environ.get("MODAL_LLAMACPP_MODEL", "minicpm5-1b")
 
