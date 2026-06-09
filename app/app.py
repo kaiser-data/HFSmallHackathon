@@ -14,11 +14,16 @@ import pathlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
+import concurrent.futures  # noqa: E402
 import gradio as gr  # noqa: E402
 from agents.dream import DreamEngine  # noqa: E402
 from agents.world import ENVIRONMENTS, LUCIDITY_START, COURAGE_MAX  # noqa: E402
+from agents.vision import dream_image  # noqa: E402
 
 engine = DreamEngine()
+# Paint each dream beat off the main thread so the picture renders *under* the
+# narration (same overlap trick as the Keeper) — near-zero added latency per turn.
+_IMG_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 
 SPEAKER = {
     "Dreamweaver": "🌌 *Dreamweaver*",
@@ -113,42 +118,53 @@ def _die_bubble() -> dict:
 
 
 def _stream_turn(intent, tier, history):
-    """Shared streaming loop -> [chatbot, state, btn1..N, intent, card, printbtn]."""
+    """Shared streaming loop -> [chatbot, state, btn1..N, intent, card, printbtn, dream]."""
     history = history or []
     history.append({"role": "user", "content": f"🧑‍🚀 {intent}"})
-    yield history, state_md(), *_hidden_btns(), "", *_card_updates()
+    yield history, state_md(), *_hidden_btns(), "", *_card_updates(), gr.update()
 
     current = None
     die_shown = False
+    img_future = None
     for speaker, delta in engine.play(intent, tier):
-        if not die_shown:                      # reveal the seeded roll the instant it's decided
-            die_shown = True
-            if engine.last_outcome is not None:
-                history.append(_die_bubble())
-                yield history, gr.update(), *_hidden_btns(), "", *_card_updates()
+        if img_future is None:
+            # Outcome is decided by now (None on the arrival beat). Paint this beat in
+            # a thread so the picture renders *under* the prose and lands ~for free.
+            img_future = _IMG_POOL.submit(dream_image, engine.state, intent, engine.last_outcome)
+        if not die_shown and engine.last_outcome is not None:
+            die_shown = True                   # reveal the seeded roll the instant it's decided
+            history.append(_die_bubble())
+            yield history, gr.update(), *_hidden_btns(), "", *_card_updates(), gr.update()
         if speaker != current:
             current = speaker
             history.append({"role": "assistant", "content": SPEAKER.get(speaker, speaker) + ": "})
         history[-1]["content"] += delta
-        yield history, gr.update(), *_hidden_btns(), "", *_card_updates()
+        yield history, gr.update(), *_hidden_btns(), "", *_card_updates(), gr.update()
 
-    yield history, state_md(), *_btn_updates(), "", *_card_updates()
+    # The picture has painted under the prose; settle it now (usually already done).
+    img_up = gr.update()
+    if img_future is not None:
+        pic = img_future.result()
+        if pic is not None:
+            img_up = gr.update(value=pic, visible=True)
+    yield history, state_md(), *_btn_updates(), "", *_card_updates(), img_up
 
 
 def begin(env_id, seed, history):
     engine.start(env_id, seed=(seed or "dream").strip())
     env = ENVIRONMENTS[env_id]
     history = [{"role": "assistant", "content": f"{env.emoji} *{env.opening}*"}]
-    yield history, state_md(), *_hidden_btns(), "", *_card_updates()
+    # Clear the prior dream's image on a fresh start.
+    yield history, state_md(), *_hidden_btns(), "", *_card_updates(), gr.update(value=None, visible=False)
     yield from _stream_turn("(You arrive and take in the scene.)", None, history)
 
 
 def take_turn(intent, history):
     if engine.state is None:
-        yield history or [], "### 🌙 Pick a world and begin first.", *_hidden_btns(), "", *_card_updates()
+        yield history or [], "### 🌙 Pick a world and begin first.", *_hidden_btns(), "", *_card_updates(), gr.update()
         return
     if engine.state.over or not (intent or "").strip():
-        yield history or [], state_md(), *_btn_updates(), "", *_card_updates()
+        yield history or [], state_md(), *_btn_updates(), "", *_card_updates(), gr.update()
         return
     yield from _stream_turn(intent.strip(), "bold", history)  # typed = a bold gamble
 
@@ -159,7 +175,7 @@ def make_choose(i):
             label, tier = engine.gambits[i]
             yield from _stream_turn(label, tier, history)
         else:
-            yield history or [], state_md(), *_btn_updates(), "", *_card_updates()
+            yield history or [], state_md(), *_btn_updates(), "", *_card_updates(), gr.update()
     return _choose
 
 
@@ -168,6 +184,9 @@ CSS = """
 #deck {border-radius: 16px;}
 #card {border: 1px solid #6c5ce7; border-radius: 14px; padding: 8px 16px;
        background: rgba(40,30,80,.45);}
+#dream {border-radius: 14px; border: 1px solid #6c5ce7; overflow: hidden;
+        box-shadow: 0 8px 30px rgba(108,92,231,.35);}
+#dream img {border-radius: 12px;}
 footer {visibility: hidden;}
 """
 
@@ -189,13 +208,15 @@ with gr.Blocks(title="DAYDREAM") as demo:
                 go = gr.Button("Do it", variant="primary", scale=1)
             card = gr.Markdown(visible=False, elem_id="card")
             printbtn = gr.Button("📸 Freeze the dream card", visible=False)
-        with gr.Column(scale=1):
+        with gr.Column(scale=2):
+            dream_img = gr.Image(label="🌌 The dream", height=300, visible=False,
+                                 interactive=False, elem_id="dream")
             world = gr.Dropdown(ENV_CHOICES, value="candy_desert", label="World")
             seed = gr.Textbox(value="abc123", label="Seed (shareable)")
             start = gr.Button("Begin the dream 🌙", variant="primary")
             panel = gr.Markdown(state_md())
 
-    outs = [chat, panel, *btns, intent, card, printbtn]
+    outs = [chat, panel, *btns, intent, card, printbtn, dream_img]
     start.click(begin, [world, seed, chat], outs)
     go.click(take_turn, [intent, chat], outs)
     intent.submit(take_turn, [intent, chat], outs)

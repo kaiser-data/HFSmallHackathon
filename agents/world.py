@@ -22,6 +22,7 @@ class Environment:
     mission: str          # the soft goal (ignorable — wandering is fine)
     start_location: str
     inhabitant: str       # one-line persona seed for the local NPC voice
+    visual: str = ""      # art-direction seed for the dream-image model (vision.py)
 
 
 ENVIRONMENTS: dict[str, Environment] = {
@@ -31,6 +32,8 @@ ENVIRONMENTS: dict[str, Environment] = {
         "Find what is humming under the dunes — or don't, and just wander.",
         "a ridge of warm sugar-glass",
         "a nervous gummy bear who knows too much and trusts too little",
+        "a surreal candy desert under two pale moons, endless dunes of translucent "
+        "crystalline sugar-glass, soft pastel pinks lilacs and mint, spun-sugar haze",
     ),
     "sunken_city": Environment(
         "sunken_city", "The Sunken City", "🌊",
@@ -38,6 +41,8 @@ ENVIRONMENTS: dict[str, Environment] = {
         "Find the song the bells are reaching for.",
         "the steps of a flooded cathedral",
         "an old eel who used to be the city's bellringer",
+        "a drowned dreamlike city deep underwater, leaning bell-towers and flooded "
+        "cathedrals in deep teal gloom, drifting silt, pale godrays of light",
     ),
     "noir_alley": Environment(
         "noir_alley", "Rain Street", "🕵️",
@@ -45,6 +50,8 @@ ENVIRONMENTS: dict[str, Environment] = {
         "Find out who took the moon.",
         "under a flickering sign that says OPEN, lying",
         "a trench-coated cat informant who speaks only in riddles and prices",
+        "a rain-soaked neon noir alley at night, wet asphalt mirroring magenta and "
+        "cyan signs, deep shadows, fog, a conspicuously moonless dim sky",
     ),
     "red_planet": Environment(
         "red_planet", "The Red Planet", "🚀",
@@ -52,6 +59,8 @@ ENVIRONMENTS: dict[str, Environment] = {
         "Get the rocket flying again before the tall thing reaches you.",
         "beside a cooling tin rocket",
         "a polite but very hungry zorch that insists it just wants to talk",
+        "a rust-red dream planet, a small retro tin rocket cooling on ochre dunes, "
+        "a tall watching silhouette on the horizon, dusty wind, two faint moons",
     ),
     "token_wood": Environment(
         "token_wood", "Thousand Token Wood", "🌲",
@@ -59,6 +68,8 @@ ENVIRONMENTS: dict[str, Environment] = {
         "Reach the clearing where the wood is trying to finish a thought.",
         "at the wood's whispering edge",
         "a small fox made of footnotes who narrates itself",
+        "an enchanted misty wood where every leaf is printed text and words, pages "
+        "and letters as foliage, soft diffuse light, gentle storybook surrealism",
     ),
 }
 

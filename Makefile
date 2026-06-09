@@ -28,6 +28,8 @@ whoami:
 status:
 	@$(PY) echo "=== Modal workspace: $$(modal profile current) ===" ; \
 	  modal app list 2>/dev/null | grep -iE "small-hack|App ID" || true ; \
+	  echo "=== spend ===" ; \
+	  python scripts/spend.py 2>/dev/null || echo "(spend unavailable)" ; \
 	  echo "=== warm lease ===" ; \
 	  modal run modal_app/guardian.py::lease_status 2>/dev/null || echo "(guardian not deployed)"
 
