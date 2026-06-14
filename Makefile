@@ -58,3 +58,8 @@ demo-up:
 
 demo-down:
 	@$(PY) modal run modal_app/guardian.py::lease_clear
+
+# Watch the guardian's scheduled keepalive runs (confirm the cron is firing and
+# whether it's warming or idle). Ctrl-C to stop; dashboard also shows run history.
+logs:
+	@$(PY) modal app logs small-hack-guardian

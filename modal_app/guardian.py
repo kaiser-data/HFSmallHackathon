@@ -67,7 +67,11 @@ def _ping(url: str, method: str) -> None:
         pass  # any response (even 401/422/404) resets the idle timer — all we need
 
 
-@app.function(image=image, schedule=modal.Period(minutes=3), timeout=120)
+# Cron (not Period): a cron schedule is unaffected by redeploys, whereas
+# Period resets its timer every deploy — and we redeploy the guardian alongside
+# the GPU apps. "*/3 * * * *" = every 3 minutes, comfortably under the 5-min
+# scaledown_window so a leased app never goes cold mid-demo.
+@app.function(image=image, schedule=modal.Cron("*/3 * * * *"), timeout=120)
 def keepalive():
     """Every 3 min: warm the leased apps, or do nothing if the lease has lapsed."""
     exp = state.get("expiry", 0.0)
