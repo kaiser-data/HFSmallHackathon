@@ -180,13 +180,44 @@ def make_choose(i):
 
 
 CSS = """
-.gradio-container {background: radial-gradient(1200px 600px at 50% -10%, #2a2350, #0d0b1f 60%);}
-#deck {border-radius: 16px;}
-#card {border: 1px solid #6c5ce7; border-radius: 14px; padding: 8px 16px;
+/* --- dream atmosphere: layered nebula + slow drift, pure CSS, no JS --- */
+.gradio-container {
+  background:
+    radial-gradient(900px 500px at 15% -10%, rgba(124,92,255,.28), transparent 60%),
+    radial-gradient(1000px 600px at 85% 0%, rgba(56,120,200,.22), transparent 55%),
+    radial-gradient(1200px 800px at 50% 120%, rgba(180,80,200,.16), transparent 60%),
+    #0b0a1c;
+  background-attachment: fixed;
+}
+.gradio-container::before {  /* drifting star-dust */
+  content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .5; z-index: 0;
+  background-image:
+    radial-gradient(1.5px 1.5px at 20% 30%, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 70% 60%, #cdbcff, transparent),
+    radial-gradient(1px 1px at 40% 80%, #fff, transparent),
+    radial-gradient(1px 1px at 85% 25%, #bcd4ff, transparent),
+    radial-gradient(1.5px 1.5px at 55% 15%, #fff, transparent);
+  background-size: 600px 600px; animation: drift 90s linear infinite;
+}
+@keyframes drift { from {background-position: 0 0;} to {background-position: 600px 600px;} }
+h1 { letter-spacing: .5px; text-shadow: 0 2px 24px rgba(124,92,255,.5); }
+#deck {border-radius: 16px; backdrop-filter: blur(2px);
+       box-shadow: 0 10px 40px rgba(0,0,0,.35), inset 0 0 0 1px rgba(124,92,255,.18);}
+#card {border: 1px solid #7c5cff; border-radius: 14px; padding: 8px 16px;
        background: rgba(40,30,80,.45);}
-#dream {border-radius: 14px; border: 1px solid #6c5ce7; overflow: hidden;
-        box-shadow: 0 8px 30px rgba(108,92,231,.35);}
-#dream img {border-radius: 12px;}
+/* the dream image is the HERO — large, glowing, gently breathing */
+#dream {border-radius: 16px; border: 1px solid rgba(124,92,255,.6); overflow: hidden;
+        box-shadow: 0 12px 50px rgba(124,92,255,.45); animation: breathe 7s ease-in-out infinite;}
+#dream img {border-radius: 14px;}
+@keyframes breathe { 0%,100% {box-shadow: 0 12px 50px rgba(124,92,255,.35);}
+                     50% {box-shadow: 0 16px 64px rgba(124,92,255,.6);} }
+/* warm-up banner shimmers so the cold-start feels like the dream forming */
+#warmup {border-left: 3px solid #7c5cff; padding: 4px 14px; margin: -4px 0 6px;
+         border-radius: 10px; font-size: .92em; position: relative; overflow: hidden;
+         background: linear-gradient(90deg, rgba(124,92,255,.10), rgba(124,92,255,.22), rgba(124,92,255,.10));
+         background-size: 200% 100%; animation: shimmer 3.5s ease-in-out infinite;}
+@keyframes shimmer { 0% {background-position: 200% 0;} 100% {background-position: -200% 0;} }
+.gr-button-primary { box-shadow: 0 6px 24px rgba(124,92,255,.4); }
 footer {visibility: hidden;}
 """
 
@@ -196,6 +227,12 @@ with gr.Blocks(title="DAYDREAM") as demo:
         "Take **gambits** through a dream a fleet of small models is dreaming for you. "
         "Survive on **lucidity**, climb to the prize — and watch **Hobbes** grow brave "
         "because of the bets you take together. *Small models, big dreams.*"
+    )
+    gr.Markdown(
+        "> ⏳ **First turn waking the dream?** The models run on serverless GPUs that "
+        "sleep when idle, so the **very first turn can take ~90s** to cold-start. "
+        "After that, turns stream in a few seconds. Hang tight — the dream is loading. ✨",
+        elem_id="warmup",
     )
     with gr.Row():
         with gr.Column(scale=3):
@@ -209,8 +246,8 @@ with gr.Blocks(title="DAYDREAM") as demo:
             card = gr.Markdown(visible=False, elem_id="card")
             printbtn = gr.Button("📸 Freeze the dream card", visible=False)
         with gr.Column(scale=2):
-            dream_img = gr.Image(label="🌌 The dream", height=300, visible=False,
-                                 interactive=False, elem_id="dream")
+            dream_img = gr.Image(label="🌌 The dream", height=380, visible=False,
+                                 interactive=False, elem_id="dream", show_label=False)
             world = gr.Dropdown(ENV_CHOICES, value="candy_desert", label="World")
             seed = gr.Textbox(value="abc123", label="Seed (shareable)")
             start = gr.Button("Begin the dream 🌙", variant="primary")

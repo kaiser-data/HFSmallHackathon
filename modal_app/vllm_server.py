@@ -30,6 +30,16 @@ image = (
         # the mamba/GDN path already uses Triton (self-compiling).
         "VLLM_ATTENTION_BACKEND": "FLASH_ATTN",
         "VLLM_USE_FLASHINFER_SAMPLER": "0",
+        # CRITICAL: serve() reads these at RUNTIME inside the container, where the
+        # local .env does NOT exist — so we must BAKE the chosen values into the
+        # image env here (this .env() call runs client-side at deploy, capturing
+        # the local values). Without this, the container falls back to defaults and
+        # silently serves the wrong model. (Decorator args like gpu= bake fine;
+        # function-body os.environ reads do not.)
+        "VLLM_MODEL": MODEL_NAME,
+        "VLLM_REVISION": MODEL_REVISION,
+        "VLLM_MAX_LEN": os.environ.get("VLLM_MAX_LEN", "8192"),
+        "VLLM_EAGER": os.environ.get("VLLM_EAGER", "0"),
     })
 )
 
@@ -60,11 +70,12 @@ def serve():
         "--revision", MODEL_REVISION,
         "--host", "0.0.0.0", "--port", "8000",
         "--api-key", API_KEY,
-        "--max-model-len", os.environ.get("VLLM_MAX_LEN", "16384"),
-        # Skip torch.compile + cudagraph capture: on a 40GB card with 27B FP8
-        # weights already resident, that step is both slow (blew the startup
-        # window) and memory-hungry. Eager start is fast and reliable; the
-        # inference-speed cost is invisible for a turn-based narrative game.
-        "--enforce-eager",
+        "--max-model-len", os.environ.get("VLLM_MAX_LEN", "8192"),
     ]
+    # Eager mode skips torch.compile + cudagraph capture. It was needed for the 27B
+    # (capture blew the startup window + memory on a 40GB card), but a small ~7-8B
+    # model captures graphs in seconds — so default to graphs ON for ~1.5-2x faster
+    # decode. Set VLLM_EAGER=1 to force eager again on a big model.
+    if os.environ.get("VLLM_EAGER", "0") == "1":
+        cmd.append("--enforce-eager")
     subprocess.Popen(" ".join(cmd), shell=True)
