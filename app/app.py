@@ -270,8 +270,9 @@ with gr.Blocks(title="DAYDREAM") as demo:
     )
     gr.Markdown(
         "> ⏳ **First turn waking the dream?** The models run on serverless GPUs that "
-        "sleep when idle, so the **very first turn can take ~90s** to cold-start. "
-        "After that, turns stream in a few seconds. Hang tight — the dream is loading. ✨",
+        "sleep when idle, so the **very first turn can take 1–2 min** to wake. "
+        "After that, every turn is **~5 seconds** — narration streams instantly. "
+        "Hang tight — the dream is forming. ✨",
         elem_id="warmup",
     )
     with gr.Row():
