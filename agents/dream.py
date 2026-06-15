@@ -90,17 +90,23 @@ class DreamEngine:
     # in tokens, and --enforce-eager decode is unhurried on the 27B). Each cap is
     # sized to the job: 2-4 sentences of prose, one ominous line, small JSON blobs.
     dreamweaver: Agent = field(default_factory=lambda: Agent(
-        "Dreamweaver", "specialist", DREAMWEAVER_SYS, LLMConfig(0.95, 180)))
+        "Dreamweaver", "specialist", DREAMWEAVER_SYS, LLMConfig(0.95, 130)))
     nightmare: Agent = field(default_factory=lambda: Agent(
-        "Nightmare", "specialist", NIGHTMARE_SYS, LLMConfig(1.0, 70)))
+        "Nightmare", "specialist", NIGHTMARE_SYS, LLMConfig(1.0, 45)))
     hobbes: Agent = field(default_factory=lambda: Agent(
-        "Hobbes", "specialist", HOBBES_SYS, LLMConfig(0.85, 140)))
+        "Hobbes", "specialist", HOBBES_SYS, LLMConfig(0.85, 100)))
     # Keeper is presentational memory, not game math — give it a SHORT retry budget
     # so a cold/slow router degrades fast (state simply doesn't update this turn)
     # instead of holding the turn at the keeper_job join. The narrator keeps the
     # wide default budget to patiently ride out a cold start.
     keeper: Agent = field(default_factory=lambda: Agent(
         "Keeper", "router", KEEPER_SYS, LLMConfig(0.2, 160), retries=2, retry_wait=3))
+
+    # Persistent pool for fire-and-forget background work (the Keeper's state write).
+    # Not part of equality/repr.
+    _pool: concurrent.futures.ThreadPoolExecutor = field(
+        default_factory=lambda: concurrent.futures.ThreadPoolExecutor(max_workers=2),
+        repr=False, compare=False)
 
     # --- lifecycle ---
     def start(self, env_id: str, seed: str = "dream") -> None:
@@ -153,38 +159,30 @@ class DreamEngine:
                 yield "Nightmare", d
             scene += " " + twist
 
-        # 5+6) Hobbes (specialist) and the Keeper (router) both need only the
-        # finished scene, and they live on different backends — so kick the Keeper
-        # off in a thread and let it run *under* the slower Hobbes call instead of
-        # stacking after it. The router (and its cold-start retry variance) thus
-        # costs ~0 on the turn's critical path. Snapshot the Hobbes prompt first so
-        # its state read can't race the Keeper's state write.
+        # 6) Keeper (router) writes presentational state (location/items). It is NOT
+        # game math, so FIRE IT AND DON'T WAIT — a cold/slow llama.cpp must never
+        # delay the gambit buttons. It runs on the persistent pool and lands in the
+        # background (location may lag a turn at worst). The context is snapshotted
+        # so the background write can't race this turn's reads.
         ctx = self._ctx()
-        hobbes_prompt = (f"{ctx}\nYOUR MOOD: {MOOD_NOTE[s.mood]}\n"
-                         f"The dreamer did: {intent}\nScene: {scene}\n"
-                         f"React and offer three gambits.")
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            keeper_job = pool.submit(self._update, ctx, intent, scene)
+        self._pool.submit(self._update, ctx, intent, scene)
 
-            # 5) Hobbes reacts (voice keyed to courage) + offers three gambits
-            if not s.over:
-                h = self.hobbes.json(hobbes_prompt)
-                reaction = str(h.get("reaction") or "...").strip()
-                ch = h.get("choices")
-                labels = ([c.strip() for c in ch if isinstance(c, str) and c.strip()][:3]
-                          if isinstance(ch, list) else [])
-                self.gambits = self._make_gambits(labels)
-                yield "Hobbes", reaction
-            else:
-                self.gambits = []
-                yield "Hobbes", self.farewell()
-
-            try:
-                keeper_job.result()  # settle the state write before the turn ends
-            except Exception:
-                # Keeper is presentational memory, not game math. Never fail an
-                # otherwise valid turn because the tiny router returned a bad patch.
-                pass
+        # 5) Hobbes reacts (voice keyed to courage) + offers three gambits. This is
+        # the LAST thing on the turn's critical path → buttons appear right after.
+        if not s.over:
+            h = self.hobbes.json(
+                f"{ctx}\nYOUR MOOD: {MOOD_NOTE[s.mood]}\n"
+                f"The dreamer did: {intent}\nScene: {scene}\n"
+                f"React and offer three gambits.")
+            reaction = str(h.get("reaction") or "...").strip()
+            ch = h.get("choices")
+            labels = ([c.strip() for c in ch if isinstance(c, str) and c.strip()][:3]
+                      if isinstance(ch, list) else [])
+            self.gambits = self._make_gambits(labels)
+            yield "Hobbes", reaction
+        else:
+            self.gambits = []
+            yield "Hobbes", self.farewell()
 
     def _make_gambits(self, labels: list[str]) -> list[tuple[str, str]]:
         """Zip the model's words onto code-fixed tiers; fall back per missing slot."""
