@@ -47,59 +47,95 @@ you take *together*. Code rolls the dice; the little models supply the soul.
 
 ---
 
-## 🧠 The Fleet Architecture
+## 🧠 Architecture
 
-DAYDREAM uses a **Distributed Fleet Architecture** to achieve coherence on models as small as 1B parameters.
+DAYDREAM is a **fleet of small models refereed by code**: a deterministic Python core
+owns the truth and the dice, while a handful of sub-32B models — each on its own Modal
+GPU — supply only words and pixels. Three views:
 
-### Agent Topology
+### 1 · System — three layers, one rule
+
+> **The rule:** outcomes flow *down* from code; only language flows *up* from models.
+
 ```mermaid
-graph TD
-    subgraph "The Orchestrator (Python)"
-        RES[Seeded Resolver]
-        WS[(WorldState)]
+flowchart TB
+    P([👤 Player])
+
+    subgraph CODE["⚙️ Orchestration — Python · owns the truth"]
+        direction LR
+        ENGINE["DreamEngine<br/><i>turn loop</i>"]
+        RESOLVER{{"🎲 Resolver<br/><i>seeded dice + rewards</i>"}}
+        STATE[("🗺️ WorldState<br/><i>externalized memory</i>")]
     end
 
-    subgraph "The Fleet (Small Models ≤ 32B)"
-        DW[[🌌 Dreamweaver<br/>Qwen3-30B-A3B MoE]]
-        NM[[👁 Nightmare<br/>Qwen3-30B-A3B MoE]]
-        HB[[🐯 Hobbes<br/>Qwen3-30B-A3B MoE]]
-        KP[[🗺 Keeper<br/>MiniCPM-1B]]
+    subgraph FLEET["🤖 The Fleet — Modal serverless GPUs · every model ≤ 32B"]
+        direction LR
+        SPEC["🌌 Dreamweaver · 👁 Nightmare · 🐯 Hobbes<br/><b>Qwen3-30B-A3B</b> MoE on vLLM<br/><i>30B total · only 3B active/token</i>"]
+        ROUTER["🗺 Keeper<br/><b>MiniCPM-1B</b> · llama.cpp"]
+        VISION["🎨 Painter<br/><b>FLUX.1-schnell</b>"]
     end
 
-    RES -->|Verdict| DW
-    WS -->|Context Slice| DW
-    WS -->|Context Slice| HB
-    DW -->|Scene Context| NM
-    DW -->|Scene Context| KP
-    KP -->|State Patch| WS
-    DW -.-> IMG[🎨 FLUX Vision]
+    P -- "gambit (safe/bold/reckless)" --> ENGINE
+    ENGINE --> RESOLVER -- "verdict" --> ENGINE
+    ENGINE <-. "context slice ↔ patch" .-> STATE
+    ENGINE == "narrate · react" ==> SPEC
+    ENGINE -. "async" .-> ROUTER
+    ENGINE -. "async" .-> VISION
+    SPEC == "prose + 3 choices" ==> P
+    VISION -. "image" .-> P
+    ROUTER -. "state patch" .-> STATE
 
-    style DW fill:#1b1640,stroke:#7c5cff,color:#fff
-    style KP fill:#241a4d,stroke:#9d7bff,color:#fff
-    style RES fill:#0b0a1c,stroke:#ff5c5c,color:#fff
+    classDef code fill:#1b1640,stroke:#7c5cff,color:#fff;
+    classDef fleet fill:#241a4d,stroke:#9d7bff,color:#fff;
+    classDef dice fill:#2a1022,stroke:#ff5c7c,color:#fff;
+    classDef player fill:#0b0a1c,stroke:#cdbcff,color:#fff;
+    class ENGINE,STATE code; class SPEC,ROUTER,VISION fleet; class RESOLVER dice; class P player;
 ```
 
-### Turn Orchestration (Parallel Execution)
+### 2 · One turn — critical path vs. async (why it feels instant)
+
 ```mermaid
 sequenceDiagram
-    participant P as Player
-    participant C as Code (Resolver)
-    participant D as Dreamweaver (30B-A3B MoE)
-    participant K as Keeper (1B)
-    participant V as Vision (FLUX)
+    autonumber
+    actor P as 👤 Player
+    participant C as ⚙️ Resolver
+    participant D as 🌌 Dreamweaver
+    participant H as 🐯 Hobbes
+    participant K as 🗺 Keeper
+    participant F as 🎨 FLUX
 
-    P->>C: Picks "Reckless" Gambit
-    C->>C: Roll Dice (Seeded)
-    C->>D: Handoff Verdict + State
-    par Streaming Narration
-        D-->>P: Streams prose...
-    and Parallel Update
-        C->>K: Patch World State
-        C->>V: Generate Image
+    P->>C: pick gambit
+    C->>C: roll seeded dice → verdict
+    Note over C: the outcome is FIXED before any model speaks — the game is fair
+
+    C->>D: narrate this verdict
+    D-->>P: streams prose · first words in ~0.4s
+
+    par off the critical path (async)
+        C-)K: patch world-state (background)
+        C-)F: paint the beat (~0.5s on GPU)
     end
-    K-->>C: Update Inventory/Location
-    V-->>P: Display Image (Lands with Prose)
+
+    D->>H: finished scene
+    H-->>P: reaction + 3 fresh gambits · ~5s
+    F--)P: dream image fades in
+    Note over P,F: you wait only for narration + choices (~5s);<br/>state & image never block the turn
 ```
+
+### 3 · The fairness spine — code owns the dice
+
+```mermaid
+flowchart LR
+    G["gambit + seed + turn"] --> R{{"🎲 resolve()<br/>pure · deterministic"}}
+    R --> V["verdict<br/>success / partial / fail<br/>+ reward magnitudes"]
+    V --> A["apply()<br/>move LUCIDITY · PROGRESS<br/>· COURAGE · MENACE"]
+    V --> N["🌌 model narrates<br/><i>the words, not the outcome</i>"]
+    A --> S[("WorldState")]
+    classDef c fill:#2a1022,stroke:#ff5c7c,color:#fff;
+    classDef m fill:#241a4d,stroke:#9d7bff,color:#fff;
+    class R,V,A c; class N m;
+```
+*Same `(seed, turn)` → same dice → **"beat my run, seed `abc123`"** is honest. A model can never decide whether you succeed.*
 
 ---
 
