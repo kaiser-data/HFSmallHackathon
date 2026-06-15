@@ -37,11 +37,20 @@ REGISTRY = {
 }
 
 
+# Per-role client timeout. The specialist (narrator) needs a long window to ride
+# out a cold start so the dream always appears. The router (presentational Keeper)
+# gets a SHORT one so a cold/broken endpoint fails fast and degrades — never
+# blocking the turn behind a 120s hang. (Retry COUNT is set per-agent in base.py;
+# this caps each individual request.)
+ROLE_TIMEOUT = {"specialist": 120.0, "router": 18.0}
+
+
 @lru_cache(maxsize=None)
 def get_client(role: str) -> tuple[OpenAI, str]:
     """Return (client, model_name) for a logical role."""
     cfg = REGISTRY.get(role)
     if cfg is None:
         raise KeyError(f"Unknown agent role '{role}'. Known: {list(REGISTRY)}")
-    client = OpenAI(base_url=cfg["base_url"], api_key=cfg["api_key"], timeout=120.0)
+    client = OpenAI(base_url=cfg["base_url"], api_key=cfg["api_key"],
+                    timeout=ROLE_TIMEOUT.get(role, 60.0))
     return client, cfg["model"]

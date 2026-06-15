@@ -25,6 +25,13 @@ engine = DreamEngine()
 # narration (same overlap trick as the Keeper) — near-zero added latency per turn.
 _IMG_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 
+# Ambient dream music: a static looping track played IN-BROWSER — zero backend,
+# zero latency, zero cold-start. Activates only if a (CC0/royalty-free) file is
+# present, so the app never breaks without it. Drop one at assets/dream-ambient.mp3.
+import os as _os  # noqa: E402
+MUSIC_PATH = str(pathlib.Path(__file__).resolve().parent.parent / "assets" / "dream-ambient.mp3")
+HAS_MUSIC = _os.path.exists(MUSIC_PATH)
+
 SPEAKER = {
     "Dreamweaver": "🌌 *Dreamweaver*",
     "Nightmare": "👁 *Nightmare*",
@@ -279,6 +286,9 @@ with gr.Blocks(title="DAYDREAM") as demo:
             seed = gr.Textbox(value="abc123", label="Seed (shareable)")
             start = gr.Button("Begin the dream 🌙", variant="primary")
             panel = gr.Markdown(state_md())
+            if HAS_MUSIC:  # looping ambient track; play once, it loops the session
+                gr.Audio(MUSIC_PATH, loop=True, autoplay=False,
+                         label="🎵 Dream music", elem_id="music")
 
     outs = [chat, panel, *btns, intent, card, printbtn, dream_img]
     start.click(begin, [world, seed, chat], outs)

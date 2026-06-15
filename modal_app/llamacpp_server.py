@@ -23,7 +23,13 @@ image = (
     # its own Python bootstrap (otherwise the binary sees "python" as a bad arg).
     .entrypoint([])
     .pip_install("huggingface_hub[hf_transfer]>=0.24")
-    .env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
+    .env({
+        "HF_HUB_ENABLE_HF_TRANSFER": "1",
+        # Clearing the ENTRYPOINT bypassed the image's lib-path setup, so the
+        # server binary couldn't find libllama-server-impl.so ("cannot open shared
+        # object file"). Its shared libs live in /app — put that on the linker path.
+        "LD_LIBRARY_PATH": "/app:/usr/local/lib",
+    })
 )
 
 hf_cache = modal.Volume.from_name("hf-cache", create_if_missing=True)
