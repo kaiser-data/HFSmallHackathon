@@ -73,17 +73,26 @@ hf_secret = modal.Secret.from_name(os.environ.get("FLUX_HF_SECRET", "huggingface
 class Flux:
     @modal.enter()
     def load(self):
+        import time
         import torch
         from diffusers import FluxPipeline
 
+        t0 = time.time()
         self.pipe = FluxPipeline.from_pretrained(MODEL, torch_dtype=torch.bfloat16)
         if OFFLOAD:
             self.pipe.enable_model_cpu_offload()
         else:
             self.pipe.to("cuda")
+        # OBSERVABILITY: confirm what hardware we actually got and how we placed the
+        # model — the difference between "fast on GPU" and "silently slow on CPU".
+        dev = next(self.pipe.transformer.parameters()).device
+        gpu = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "NO CUDA (CPU!)"
+        print(f"[FLUX] loaded {MODEL} in {time.time()-t0:.1f}s | offload={OFFLOAD} | "
+              f"transformer device={dev} | gpu={gpu} | steps={STEPS} size={SIZE}", flush=True)
 
     @modal.fastapi_endpoint(method="POST", docs=False)
     def generate(self, data: dict):
+        import time
         import torch
         from fastapi import Response
 
@@ -95,6 +104,7 @@ class Flux:
         if (sd := data.get("seed")) is not None:
             gen = torch.Generator("cpu").manual_seed(int(sd) % (2**32))
 
+        t0 = time.time()
         img = self.pipe(
             prompt,
             num_inference_steps=STEPS,
@@ -103,7 +113,13 @@ class Flux:
             max_sequence_length=256,
             generator=gen,
         ).images[0]
+        dt = time.time() - t0
+        # Per-image timing in the logs (`modal app logs small-hack-flux`) so we can
+        # SEE generation cost, not guess it from client round-trips.
+        print(f"[FLUX] image in {dt:.2f}s ({STEPS} steps @ {SIZE}px)", flush=True)
 
         buf = io.BytesIO()
         img.save(buf, format="PNG")
-        return Response(content=buf.getvalue(), media_type="image/png")
+        # Also surface timing to the caller for client-side logging/HUD.
+        return Response(content=buf.getvalue(), media_type="image/png",
+                        headers={"X-Gen-Seconds": f"{dt:.2f}"})
