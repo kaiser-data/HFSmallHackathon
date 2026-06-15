@@ -95,8 +95,12 @@ class DreamEngine:
         "Nightmare", "specialist", NIGHTMARE_SYS, LLMConfig(1.0, 70)))
     hobbes: Agent = field(default_factory=lambda: Agent(
         "Hobbes", "specialist", HOBBES_SYS, LLMConfig(0.85, 140)))
+    # Keeper is presentational memory, not game math — give it a SHORT retry budget
+    # so a cold/slow router degrades fast (state simply doesn't update this turn)
+    # instead of holding the turn at the keeper_job join. The narrator keeps the
+    # wide default budget to patiently ride out a cold start.
     keeper: Agent = field(default_factory=lambda: Agent(
-        "Keeper", "router", KEEPER_SYS, LLMConfig(0.2, 160)))
+        "Keeper", "router", KEEPER_SYS, LLMConfig(0.2, 160), retries=2, retry_wait=3))
 
     # --- lifecycle ---
     def start(self, env_id: str, seed: str = "dream") -> None:

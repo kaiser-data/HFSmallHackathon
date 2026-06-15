@@ -85,6 +85,12 @@ class Agent:
     role: str            # registry key: "specialist" | "router"
     system: str          # persona / instructions
     cfg: LLMConfig = field(default_factory=LLMConfig)
+    # Per-agent retry budget. Essential agents (the narrator) inherit the wide
+    # default so they patiently wait out a cold start; presentational agents (the
+    # Keeper) override to a SHORT budget so a cold endpoint degrades fast instead
+    # of holding the whole turn hostage.
+    retries: int = RETRIES
+    retry_wait: float = RETRY_WAIT
 
     def _messages(self, user: str, history: list[dict] | None) -> list[dict]:
         return [{"role": "system", "content": f"{self.system} {NO_THINK}"}, *(history or []),
@@ -99,7 +105,7 @@ class Agent:
         # Open the stream with cold-start retries; once streaming we don't restart
         # mid-sentence — a stream that breaks just ends the (already-narrated) beat.
         last_err: Exception | None = None
-        for attempt in range(RETRIES):
+        for attempt in range(self.retries):
             try:
                 s = client.chat.completions.create(
                     model=model, messages=self._messages(user, history),
@@ -113,8 +119,8 @@ class Agent:
                 return
             except Exception as e:  # transient: cold endpoint, timeout, blip
                 last_err = e
-                if attempt < RETRIES - 1:
-                    time.sleep(RETRY_WAIT)
+                if attempt < self.retries - 1:
+                    time.sleep(self.retry_wait)
         # Degraded but never crashing: keep the dream moving with a soft beat.
         yield "The dream wavers for a moment, then steadies."
         _ = last_err
@@ -132,7 +138,7 @@ class Agent:
         if MOCK:
             return loose_json(_mock_line(self.name, user)) or {}
         client, model = get_client(self.role)
-        for attempt in range(RETRIES):
+        for attempt in range(self.retries):
             try:
                 r = client.chat.completions.create(
                     model=model, messages=self._messages(user, history),
@@ -146,6 +152,6 @@ class Agent:
                 text = msg.content or getattr(msg, "reasoning_content", "") or ""
                 return loose_json(text)
             except Exception:
-                if attempt < RETRIES - 1:
-                    time.sleep(RETRY_WAIT)
+                if attempt < self.retries - 1:
+                    time.sleep(self.retry_wait)
         return {}
