@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 
 from .base import Agent, LLMConfig
 from .world import ENVIRONMENTS, WorldState, TIERS, courage_tier, COURAGE_MAX
+from .stories import arc_of, beat_for
 from .resolver import resolve, apply, Outcome
 
 # Fixed escalation order the model's three labels are zipped onto. CODE owns the
@@ -119,9 +120,16 @@ class DreamEngine:
     def start(self, env_id: str, seed: str = "dream") -> None:
         env = ENVIRONMENTS[env_id]
         self.state = WorldState.from_env(env, seed=seed)
+        # Use the deep arc's richer goal as the visible quest, if this world has one.
+        arc = arc_of(env_id)
+        if arc and arc.get("goal"):
+            self.state.mission = arc["goal"]
         self.state.log.append("the dream begins")
         self.gambits = []
         self.last_outcome = None
+
+    def _beat(self, progress: int) -> str:
+        return beat_for(self.state.env_id, progress) if self.state else ""
 
     def _ctx(self) -> str:
         return self.state.context()
@@ -177,11 +185,18 @@ class DreamEngine:
                 f"The dreamer just chose: {intent}\nThat action {verdict}.\n"
                 f"React in one line, then offer three gambits that pursue the goal.")
 
-        # 2) Dreamweaver narrates the pre-decided outcome — concurrent with Hobbes
+        # 2) Dreamweaver narrates the pre-decided outcome — concurrent with Hobbes,
+        # and STEERED BY THE STORY ARC: it's handed the current plot beat (keyed to
+        # progress) so the dream evolves through setup → twist → cost → climax instead
+        # of disconnected moments. The beat is the destination; the verdict is how the
+        # player's action moves toward (success) or away from (fail) it.
+        proj_progress = min(100, s.progress + (out.progress_reward if out else 0))
+        beat = self._beat(proj_progress)
+        story = f"\nSTORY BEAT (narrate toward this, don't quote it): {beat}" if beat else ""
         scene = ""
         for d in self.dreamweaver.stream(
-                f"{self._ctx()}\nThe dreamer: {intent}\nThis action {verdict}.{climax}\n"
-                f"Move the story toward the goal and narrate this beat."):
+                f"{self._ctx()}\nThe dreamer: {intent}\nThis action {verdict}.{climax}{story}\n"
+                f"Advance the story toward the beat and narrate what happens now."):
             scene += d
             yield "Dreamweaver", d
 
