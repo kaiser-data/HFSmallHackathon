@@ -59,14 +59,22 @@ def _mock_line(name: str, user: str) -> str:
 
 
 def loose_json(text: str) -> dict:
-    """Best-effort extract the first {...} object from a small model's reply."""
-    m = re.search(r"\{.*\}", text, re.DOTALL)
-    if not m:
-        return {}
-    try:
-        return json.loads(m.group(0))
-    except json.JSONDecodeError:
-        return {}
+    """Best-effort extract the first valid JSON object from a model reply.
+
+    Small models often wrap JSON in prose or fences, and a greedy ``{.*}`` match
+    breaks as soon as the reply contains more than one object. Use the JSON
+    decoder directly from each candidate ``{`` so braces inside strings and
+    trailing chatter are handled by the parser instead of regex.
+    """
+    decoder = json.JSONDecoder()
+    for match in re.finditer(r"\{", text or ""):
+        try:
+            obj, _ = decoder.raw_decode(text[match.start():])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict):
+            return obj
+    return {}
 
 
 @dataclass

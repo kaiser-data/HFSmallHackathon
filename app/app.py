@@ -17,7 +17,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 import concurrent.futures  # noqa: E402
 import gradio as gr  # noqa: E402
 from agents.dream import DreamEngine  # noqa: E402
-from agents.world import ENVIRONMENTS, LUCIDITY_START, COURAGE_MAX  # noqa: E402
+from agents.world import ENVIRONMENTS, LUCIDITY_START, COURAGE_MAX, TIER_TABLE  # noqa: E402
 from agents.vision import dream_image  # noqa: E402
 
 engine = DreamEngine()
@@ -52,6 +52,12 @@ def state_md() -> str:
     men = "🟪" * s.menace + ("  ⚠️ CLOSE" if s.nightmare_near else "")
     carry = ", ".join(s.inventory) if s.inventory else "—"
     tiger = MOOD_FACE[s.mood]
+    roll = ""
+    if engine.last_outcome is not None:
+        o = engine.last_outcome
+        face = {"success": "success", "partial": "partial", "fail": "fail"}[o.result]
+        roll = (f"\n\n**🎲 Last roll:** {o.roll} vs fail ≤{o.fail_threshold} "
+                f"→ **{face}** ({o.tier})")
     end = ""
     if s.complete:
         end = "\n\n✨ **YOU WAKE WITH THE PRIZE.**"
@@ -63,7 +69,8 @@ def state_md() -> str:
             f"**🎯 Progress:** {prog} {s.progress}%\n\n"
             f"**{tiger} Hobbes ({s.mood}):** {cour} {s.courage}/{COURAGE_MAX}\n\n"
             f"**👁 Menace:** {men or '—'}\n\n"
-            f"**Carrying:** {carry}  •  **Turn:** {s.turn}  •  **Seed:** `{s.seed}`{end}")
+            f"**Carrying:** {carry}  •  **Turn:** {s.turn}  •  **Seed:** `{s.seed}`"
+            f"{roll}{end}")
 
 
 def card_md() -> str:
@@ -93,7 +100,11 @@ def _btn_updates():
     for i in range(NBTN):
         if i < len(engine.gambits):
             label, tier = engine.gambits[i]
-            ups.append(gr.update(value=f"{TIER_FACE[tier]} {label}",
+            spec = TIER_TABLE[tier]
+            fail = int(spec["fail_chance"] * 100)
+            reward = int(spec["progress_reward"])
+            cost = int(spec["lucidity_cost"])
+            ups.append(gr.update(value=f"{TIER_FACE[tier]} {label} · {fail}% fail · +{reward}/-{cost}",
                                  variant=TIER_VARIANT[tier], visible=True))
         else:
             ups.append(gr.update(visible=False))

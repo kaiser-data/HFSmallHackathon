@@ -155,11 +155,12 @@ class DreamEngine:
         # stacking after it. The router (and its cold-start retry variance) thus
         # costs ~0 on the turn's critical path. Snapshot the Hobbes prompt first so
         # its state read can't race the Keeper's state write.
-        hobbes_prompt = (f"{self._ctx()}\nYOUR MOOD: {MOOD_NOTE[s.mood]}\n"
+        ctx = self._ctx()
+        hobbes_prompt = (f"{ctx}\nYOUR MOOD: {MOOD_NOTE[s.mood]}\n"
                          f"The dreamer did: {intent}\nScene: {scene}\n"
                          f"React and offer three gambits.")
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            keeper_job = pool.submit(self._update, intent, scene)
+            keeper_job = pool.submit(self._update, ctx, intent, scene)
 
             # 5) Hobbes reacts (voice keyed to courage) + offers three gambits
             if not s.over:
@@ -174,7 +175,12 @@ class DreamEngine:
                 self.gambits = []
                 yield "Hobbes", self.farewell()
 
-            keeper_job.result()  # settle the state write before the turn ends
+            try:
+                keeper_job.result()  # settle the state write before the turn ends
+            except Exception:
+                # Keeper is presentational memory, not game math. Never fail an
+                # otherwise valid turn because the tiny router returned a bad patch.
+                pass
 
     def _make_gambits(self, labels: list[str]) -> list[tuple[str, str]]:
         """Zip the model's words onto code-fixed tiers; fall back per missing slot."""
@@ -188,9 +194,13 @@ class DreamEngine:
         s = self.state
         return FAREWELL[("win" if s.complete else "loss", s.mood)]
 
-    def _update(self, intent: str, scene: str) -> None:
+    def _update(self, ctx: str, intent: str, scene: str) -> None:
         s = self.state
-        patch = self.keeper.json(f"{self._ctx()}\nAction: {intent}\nScene: {scene}\nUpdate state.")
+        if s is None:
+            return
+        patch = self.keeper.json(f"{ctx}\nAction: {intent}\nScene: {scene}\nUpdate state.")
+        if not isinstance(patch, dict):
+            return
         if loc := patch.get("location"):
             # The router sometimes echoes the context's "WORLD:"/"LOCATION:" label
             # back into the value; strip it so the state line doesn't double up.
