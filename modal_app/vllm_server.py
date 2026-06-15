@@ -21,7 +21,24 @@ app = modal.App("small-hack-vllm")
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
-    .pip_install("vllm>=0.22.0", "huggingface_hub[hf_transfer]>=0.24")  # current vLLM for Qwen3.5 arch
+    # Pin vLLM AND FastAPI/Starlette together. The real culprit: newer FastAPI
+    # introduced an `_IncludedRouter` route wrapper with no `.path`, and vLLM's
+    # OpenAI server iterates routes expecting `.path` on each -> every request
+    # 500s with "'_IncludedRouter' object has no attribute 'path'". Pin FastAPI/
+    # Starlette to the pre-wrapper versions vLLM was built against. (The original
+    # image worked weeks ago only because these were still old; a rebuild floated
+    # them forward and broke it.)
+    .pip_install("vllm==0.22.0", "huggingface_hub[hf_transfer]>=0.24")
+    # vLLM transitively REQUIRES a new Starlette (a CVE bump) — but that Starlette
+    # ships the `_IncludedRouter` route wrapper with no `.path`, and vLLM's own
+    # OpenAI server chokes on it, 500-ing every request. The resolver can't satisfy
+    # "new Starlette for the CVE" AND "old Starlette that works", so force the old,
+    # working pair in AFTER install with --no-deps (vLLM runs fine on it at runtime —
+    # it did for weeks; it just can't *declare* it). This is the surgical un-break.
+    .run_commands(
+        "pip install --no-deps --force-reinstall "
+        "'fastapi==0.115.6' 'starlette==0.41.3'"
+    )
     .env({
         "HF_HUB_ENABLE_HF_TRANSFER": "1",
         # The slim image has the CUDA runtime but no nvcc. FlashInfer JIT-compiles

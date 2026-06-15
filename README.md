@@ -54,6 +54,8 @@ you take *together*. Code rolls the dice; the little models supply the soul.
 4. Survive on **LUCIDITY**, climb **PROGRESS** to 100 to wake with the prize — and watch **COURAGE** turn Hobbes brave. Win or lose, the run freezes into a shareable Dream Journal.
 
 ## 🤖 The fleet
+*Full design + diagrams: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.*
+
 | Agent | Role | Backend (≤32B each) | Job |
 |---|---|---|---|
 | 🌌 Dreamweaver | specialist | Modal vLLM · Qwen3.5-27B-FP8 | narrate the pre-decided outcome |
