@@ -29,8 +29,15 @@ _IMG_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 # zero latency, zero cold-start. Activates only if a (CC0/royalty-free) file is
 # present, so the app never breaks without it. Drop one at assets/dream-ambient.mp3.
 import os as _os  # noqa: E402
-MUSIC_PATH = str(pathlib.Path(__file__).resolve().parent.parent / "assets" / "dream-ambient.mp3")
+_ASSETS = pathlib.Path(__file__).resolve().parent.parent / "assets"
+MUSIC_PATH = str(_ASSETS / "dream-ambient.mp3")
 HAS_MUSIC = _os.path.exists(MUSIC_PATH)
+
+# Pre-generated world hero images shown the INSTANT you Begin — so the world is
+# never empty while the live per-beat image generates. Maps env_id -> path | None.
+def _world_hero(env_id: str):
+    p = _ASSETS / "worlds" / f"{env_id}.png"
+    return str(p) if p.exists() else None
 
 SPEAKER = {
     "Dreamweaver": "🌌 *Dreamweaver*",
@@ -106,6 +113,32 @@ def card_md() -> str:
     )
 
 
+def build_story_md(history) -> str:
+    """The player's full dream as a keepsake markdown — every beat + the journal."""
+    s = engine.state
+    title = f"# 🌙 DAYDREAM — {s.env_name if s else 'a dream'}\n"
+    meta = (f"*Seed `{s.seed}` · {s.turn} turns · "
+            f"dreamed by a fleet of small models*\n\n" if s else "")
+    out = [title, meta, "---\n"]
+    for m in (history or []):
+        c = (m.get("content") or "").strip()
+        if c:
+            out.append(c + "\n")
+    if s and s.over:
+        out.append("\n---\n\n" + card_md())
+    out.append("\n\n*Made with DAYDREAM · small models, big dreams 🌙*")
+    return "\n".join(out)
+
+
+def download_story(history):
+    """Write the story to a temp .md and hand the path to the DownloadButton."""
+    import tempfile
+    seed = engine.state.seed if engine.state else "dream"
+    path = pathlib.Path(tempfile.gettempdir()) / f"daydream-{seed}.md"
+    path.write_text(build_story_md(history), encoding="utf-8")
+    return str(path)
+
+
 def _btn_updates():
     ups = []
     for i in range(NBTN):
@@ -143,7 +176,9 @@ def _stream_turn(intent, tier, history):
     """Shared streaming loop -> [chatbot, state, btn1..N, intent, card, printbtn, dream]."""
     history = history or []
     history.append({"role": "user", "content": f"🧑‍🚀 {intent}"})
-    yield history, state_md(), *_hidden_btns(), "", *_card_updates(), gr.update()
+    # Keep the gambit buttons VISIBLE and stable through the whole turn (no flicker).
+    # Gradio queues clicks, so a tap mid-stream just runs as the next turn.
+    yield history, state_md(), *_btn_updates(), "", *_card_updates(), gr.update()
 
     current = None
     die_shown = False
@@ -156,12 +191,12 @@ def _stream_turn(intent, tier, history):
         if not die_shown and engine.last_outcome is not None:
             die_shown = True                   # reveal the seeded roll the instant it's decided
             history.append(_die_bubble())
-            yield history, gr.update(), *_hidden_btns(), "", *_card_updates(), gr.update()
+            yield history, gr.update(), *_btn_updates(), "", *_card_updates(), gr.update()
         if speaker != current:
             current = speaker
             history.append({"role": "assistant", "content": SPEAKER.get(speaker, speaker) + ": "})
         history[-1]["content"] += delta
-        yield history, gr.update(), *_hidden_btns(), "", *_card_updates(), gr.update()
+        yield history, gr.update(), *_btn_updates(), "", *_card_updates(), gr.update()
 
     # Show the gambit buttons the INSTANT narration + Hobbes are done — don't make
     # the player wait on the slower image. (Buttons in ~8s, not ~17s.)
@@ -181,9 +216,18 @@ def _stream_turn(intent, tier, history):
 def begin(env_id, seed, history):
     engine.start(env_id, seed=(seed or "dream").strip())
     env = ENVIRONMENTS[env_id]
-    history = [{"role": "assistant", "content": f"{env.emoji} *{env.opening}*"}]
-    # Clear the prior dream's image on a fresh start.
-    yield history, state_md(), *_hidden_btns(), "", *_card_updates(), gr.update(value=None, visible=False)
+    history = [{"role": "assistant", "content": f"{env.emoji} *{env.opening}*"},
+               {"role": "assistant",
+                "content": "🎲 **Your move** — pick a gambit below (riskier = bigger "
+                            "reward, bigger chance to fail), or type your own action."}]
+    # Show the world's hero image + three gambit options INSTANTLY, so the world is
+    # never empty and you always know what to do. The live narration, Hobbes' own
+    # creative labels, and the per-beat image all layer in over the next few seconds.
+    engine.gambits = engine._make_gambits([])  # default labels, upgraded by Hobbes
+    hero = _world_hero(env_id)
+    hero_up = (gr.update(value=hero, visible=True) if hero
+               else gr.update(value=None, visible=False))
+    yield history, state_md(), *_btn_updates(), "", *_card_updates(), hero_up
     yield from _stream_turn("(You arrive and take in the scene.)", None, history)
 
 
@@ -285,7 +329,9 @@ with gr.Blocks(title="DAYDREAM") as demo:
                                     scale=8, show_label=False, autofocus=True)
                 go = gr.Button("Do it", variant="primary", scale=1)
             card = gr.Markdown(visible=False, elem_id="card")
-            printbtn = gr.Button("📸 Freeze the dream card", visible=False)
+            with gr.Row():
+                printbtn = gr.Button("📸 Freeze the dream card", visible=False)
+                dlbtn = gr.DownloadButton("📥 Download my story", size="sm")
         with gr.Column(scale=2):
             dream_img = gr.Image(label="🌌 The dream", height=380, visible=False,
                                  interactive=False, elem_id="dream", show_label=False)
@@ -304,6 +350,7 @@ with gr.Blocks(title="DAYDREAM") as demo:
     for i, b in enumerate(btns):
         b.click(make_choose(i), [chat], outs)
     printbtn.click(lambda: gr.update(visible=True), None, card)
+    dlbtn.click(download_story, [chat], dlbtn)  # export the full dream as markdown
 
 
 if __name__ == "__main__":
