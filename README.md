@@ -119,7 +119,7 @@ sequenceDiagram
     D->>H: finished scene
     H-->>P: reaction + 3 fresh gambits · ~5s
     F--)P: dream image fades in
-    Note over P,F: you wait only for narration + choices (~5s);<br/>state & image never block the turn
+    Note over P,F: you wait only for narration + choices (~5s) —<br/>state and image never block the turn
 ```
 
 ### 3 · The fairness spine — code owns the dice
