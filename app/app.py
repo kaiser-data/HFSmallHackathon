@@ -33,6 +33,10 @@ SPEAKER = {
 TIER_FACE = {"safe": "🟢", "bold": "🟡", "reckless": "🔴"}
 TIER_VARIANT = {"safe": "secondary", "bold": "primary", "reckless": "stop"}
 MOOD_FACE = {"timid": "🙀", "warming": "😼", "brave": "😺"}
+# Hobbes' bond made visible turn-to-turn — the emotional core of "Keep Your Tiger".
+MOOD_PHRASE = {"timid": "cowering behind you",
+               "warming": "finding his courage",
+               "brave": "brave — “I've got you”"}
 ENV_CHOICES = [(f"{e.emoji} {e.name}", k) for k, e in ENVIRONMENTS.items()]
 NBTN = 3
 
@@ -67,7 +71,7 @@ def state_md() -> str:
             f"**Where:** {s.location}\n\n"
             f"**🩵 Lucidity:** {luc} {s.lucidity}/{LUCIDITY_START}\n\n"
             f"**🎯 Progress:** {prog} {s.progress}%\n\n"
-            f"**{tiger} Hobbes ({s.mood}):** {cour} {s.courage}/{COURAGE_MAX}\n\n"
+            f"**{tiger} Hobbes** — *{MOOD_PHRASE[s.mood]}*\n\n{cour} {s.courage}/{COURAGE_MAX}\n\n"
             f"**👁 Menace:** {men or '—'}\n\n"
             f"**Carrying:** {carry}  •  **Turn:** {s.turn}  •  **Seed:** `{s.seed}`"
             f"{roll}{end}")
@@ -229,6 +233,10 @@ h1 { letter-spacing: .5px; text-shadow: 0 2px 24px rgba(124,92,255,.5); }
          background-size: 200% 100%; animation: shimmer 3.5s ease-in-out infinite;}
 @keyframes shimmer { 0% {background-position: 200% 0;} 100% {background-position: -200% 0;} }
 .gr-button-primary { box-shadow: 0 6px 24px rgba(124,92,255,.4); }
+/* fleet banner — makes the multi-model thesis legible at a glance */
+#fleet {border: 1px solid rgba(124,92,255,.35); border-radius: 10px;
+        padding: 4px 14px; margin: 2px 0; font-size: .9em;
+        background: rgba(124,92,255,.07);}
 footer {visibility: hidden;}
 """
 
@@ -238,6 +246,14 @@ with gr.Blocks(title="DAYDREAM") as demo:
         "Take **gambits** through a dream a fleet of small models is dreaming for you. "
         "Survive on **lucidity**, climb to the prize — and watch **Hobbes** grow brave "
         "because of the bets you take together. *Small models, big dreams.*"
+    )
+    gr.Markdown(
+        "🤖 **The fleet dreaming this** &nbsp; "
+        "🌌 Dreamweaver · 👁 Nightmare · 🐯 Hobbes &nbsp;—&nbsp; *Qwen3-30B-A3B "
+        "(MoE, only 3B active/token)* &nbsp;•&nbsp; "
+        "🗺 Keeper &nbsp;—&nbsp; *MiniCPM-1B* &nbsp;•&nbsp; "
+        "🎨 Painter &nbsp;—&nbsp; *FLUX* &nbsp;•&nbsp; **every model ≤32B**",
+        elem_id="fleet",
     )
     gr.Markdown(
         "> ⏳ **First turn waking the dream?** The models run on serverless GPUs that "

@@ -19,11 +19,13 @@ from typing import Iterator
 from .registry import get_client
 
 MOCK = bool(os.environ.get("DAYDREAM_MOCK"))
-# A Modal endpoint that has scaled down answers its first request with 503
-# ("loading model") or a connection stall. Retry briefly so a cold start
-# recovers instead of crashing the turn; then degrade gracefully.
-RETRIES = int(os.environ.get("DAYDREAM_RETRIES", "3"))
-RETRY_WAIT = float(os.environ.get("DAYDREAM_RETRY_WAIT", "8"))
+# A scaled-down Modal endpoint answers its first requests with a FAST 503
+# ("loading model"), not a slow block — so the retry WINDOW must span the whole
+# cold start (~48s cached, longer on a true cold boot), or we degrade to the
+# "dream wavers" fallback right when we should be patiently waiting. 6×15s ≈ 90s
+# of recovery, matching the UI's "first turn ~90s" promise. Tune via env.
+RETRIES = int(os.environ.get("DAYDREAM_RETRIES", "6"))
+RETRY_WAIT = float(os.environ.get("DAYDREAM_RETRY_WAIT", "15"))
 
 # Both 2026 small models reason by default, which pollutes prose with "Thinking
 # Process:" text and adds seconds per turn. Two levers, applied to every call:
