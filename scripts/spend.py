@@ -28,12 +28,19 @@ def _spend_this_month() -> float | None:
         return None
     total = 0.0
     for it in items if isinstance(items, list) else []:
-        # Be tolerant of the line-item schema: sum any plausible cost field.
-        for k in ("cost", "amount", "total", "cost_usd"):
-            v = it.get(k) if isinstance(it, dict) else None
-            if isinstance(v, (int, float)):
+        if not isinstance(it, dict):
+            continue
+        # The billing report returns Cost as a STRING (e.g. "1.128"); be tolerant
+        # of casing and of numeric-vs-string across schema variants.
+        for k in ("Cost", "cost", "amount", "total", "cost_usd"):
+            v = it.get(k)
+            if v is None:
+                continue
+            try:
                 total += float(v)
                 break
+            except (TypeError, ValueError):
+                continue
     return total
 
 

@@ -17,7 +17,8 @@
 # deploy, which bakes it into its image to derive endpoint URLs).
 PY := . .venv/bin/activate && set -a && [ -f .env ] && . ./.env ; set +a ;
 APPS := small-hack-vllm small-hack-llamacpp small-hack-flux
-LEASE_MIN ?= 30
+# Short default lease to save credits — warmth auto-expires fast; re-up if needed.
+LEASE_MIN ?= 20
 LEASE_APPS ?= vllm,llamacpp,flux
 
 .PHONY: whoami status stop deploy deploy-guardian demo-up demo-down

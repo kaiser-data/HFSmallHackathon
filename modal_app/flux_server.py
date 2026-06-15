@@ -19,8 +19,8 @@ import modal
 # schnell is 1-4 step, guidance-free, Apache-2.0, ungated — ideal for fast dreams.
 MODEL = os.environ.get("FLUX_MODEL", "black-forest-labs/FLUX.1-schnell")
 GPU = os.environ.get("FLUX_GPU", "A100-40GB")
-STEPS = int(os.environ.get("FLUX_STEPS", "4"))      # schnell is sharp by ~4 steps
-SIZE = int(os.environ.get("FLUX_SIZE", "768"))      # square; smaller = faster
+STEPS = int(os.environ.get("FLUX_STEPS", "2"))      # schnell is guidance-distilled; 2 steps is the speed/quality sweet spot
+SIZE = int(os.environ.get("FLUX_SIZE", "640"))      # square; smaller = faster (640 ≈ 2x faster than 768 in pixels)
 # FLUX bf16 (~34GB across transformer+T5+VAE) is tight on 40GB, so offload module
 # weights to CPU and stream them to the GPU per step. Adds a little latency but
 # fits comfortably; set FLUX_OFFLOAD=0 on an 80GB card for full-speed (~2s).
