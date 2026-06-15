@@ -20,10 +20,12 @@ tags:
 
 # 🌙 DAYDREAM — *Press Your Luck, Keep Your Tiger*
 
-A bedtime dream you **play**, dreamed in real time by a **fleet of small models** — none
-bigger than fits on one GPU. You take **gambits** (safe / bold / reckless) through
-surreal worlds with your stuffed tiger **Hobbes**, who grows brave because of the bets
-you take *together*. Code rolls the dice; the little models supply the soul.
+A bedtime dream you **play** — a real, goal-driven story, dreamed in real time by a
+**fleet of small models**, none bigger than fits on one GPU. Each world gives you a
+**quest**; you pursue it by taking **gambits** (safe / bold / reckless) through surreal
+scenes with your stuffed tiger **Hobbes**, who grows brave because of the bets you take
+*together*. Code rolls the dice; the little models supply the soul. Reach the goal to
+wake with the prize — or run out of lucidity and dissolve.
 
 > **The thesis — small models, big dreams.** You don't own one giant brain; you command
 > a *fleet of scrappy small minds*. In a dream, a small model's fuzziness isn't a bug —
@@ -38,12 +40,13 @@ you take *together*. Code rolls the dice; the little models supply the soul.
 
 ## ✨ What makes it different
 
-1. **A fleet, not a chatbot.** Four agents — 🌌 Dreamweaver, 👁 Nightmare, 🐯 Hobbes, 🗺 Keeper — each a small model with one job, coordinated per turn.
-2. **Code owns the dice, models own the words.** Pass/fail and every reward is computed by a seeded, model-free resolver. The models *never* decide outcomes — so it's a **fair game**, not a story that flatters you. This is the heart of the design.
-3. **Hobbes grows brave because of you.** A COURAGE meter rises when you survive bets made *with* him; his voice shifts cowering → steady → "I've got you." The "aww" is earned.
-4. **The dream paints itself.** A FLUX image model renders each beat *in parallel under the narration*, so the picture lands as the prose finishes — same overlap trick we use for the state-keeper.
-5. **Engineered for real Modal deployment.** Multi-backend (vLLM + llama.cpp + FLUX) plus a **cloud cost-guardian** we built after a runaway GPU lesson — scale-to-zero, hard container caps, and a lease-based dead-man's-switch.
-6. **Deterministic & shareable.** Same dream seed replays the same dice *and* the same images → *"beat my run, seed `abc123`."*
+1. **A real story, not a chat.** Every world is a quest with a visible goal; the Dreamweaver weaves *one coherent tale* that moves toward it each turn (forward on success, setback on failure) and resolves in a genuine climax — reach the prize, or the dream collapses.
+2. **A fleet, not a chatbot.** Five small models — 🌌 Dreamweaver, 👁 Nightmare, 🐯 Hobbes, 🗺 Keeper, 🎨 Painter — each with one job, coordinated per turn. Every model ≤32B.
+3. **Code owns the dice, models own the words.** Pass/fail and every reward is computed by a seeded, model-free resolver. The models *never* decide outcomes — so it's a **fair game**, not a story that flatters you. This is the heart of the design.
+4. **Hobbes grows brave because of you.** A COURAGE meter rises when you survive bets made *with* him; his voice shifts cowering → steady → "I've got you." The "aww" is earned.
+5. **The dream paints itself — fast.** A FLUX image renders each beat on-GPU in **~0.5s**; a pre-generated hero greets you the instant you arrive, then live per-beat images shift the scene. Choices and state run async, so a warm turn is **~5s** with narration streaming in under a second.
+6. **Engineered for real Modal deployment.** Multi-backend (vLLM MoE + llama.cpp + FLUX) plus a **cloud cost-guardian** we built after a runaway-GPU lesson — scale-to-zero, hard container caps, a lease-based dead-man's-switch, and robustness so a cold/failed backend degrades gracefully instead of hanging a turn.
+7. **Deterministic & shareable.** Same dream seed replays the same dice *and* the same images → *"beat my run, seed `abc123`."* Download your full run as a keepsake.
 
 ---
 
@@ -141,10 +144,10 @@ flowchart LR
 
 ## 🎮 How it plays
 
-1. Pick a world (Candy Desert, Sunken City, Rain Street, Red Planet, Thousand Token Wood) and a seed.
-2. Take a **gambit** — 🟢 safe / 🟡 bold / 🔴 reckless — or type your own intent (a bold gamble).
-3. The **Dreamweaver** narrates the outcome the dice already decided; the **Nightmare** presses when menace climbs; **Hobbes** reacts in his current mood and offers the next three gambits; the **Keeper** updates world-state.
-4. Survive on **LUCIDITY**, climb **PROGRESS** to 100 to wake with the prize — and watch **COURAGE** turn Hobbes brave. Win or lose, the run freezes into a shareable Dream Journal.
+1. Pick a world (Candy Desert, Sunken City, Rain Street, Red Planet, Thousand Token Wood) and a seed. A hero image and your **quest** greet you instantly.
+2. Pursue the quest: take a **gambit** — 🟢 safe / 🟡 bold / 🔴 reckless (each shows its odds + reward) — or type your own action. Hobbes' three options are concrete, scene-specific steps toward the goal.
+3. The **Dreamweaver** narrates the outcome the dice already decided, moving the story toward the goal; the **Nightmare** presses when menace climbs; **Hobbes** reacts in his current mood and offers the next steps; the **Keeper** updates world-state; the **Painter** repaints the scene.
+4. Climb **PROGRESS** to 100 to wake with the prize, or run out of **LUCIDITY** and dissolve — both end in a climactic beat. Watch **COURAGE** turn Hobbes brave along the way. Win or lose, the run freezes into a shareable Dream Journal you can download.
 
 ## 🤖 The fleet
 *Full design + diagrams: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.*
