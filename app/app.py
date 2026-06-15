@@ -84,35 +84,27 @@ def _meter(filled: int, total: int, on: str, off: str = "⬜") -> str:
 
 
 def state_md() -> str:
+    """A focused HUD: the goal, three meters that matter, Hobbes' mood. Nothing else."""
     s = engine.state
     if s is None:
-        return "### 🌙 No dream yet\nPick a world, set a seed, and begin."
+        return "### 🌙 No dream yet\nPick a world and press **Begin the dream**."
     luc = _meter(s.lucidity, LUCIDITY_START, "🟥")
-    cour = _meter(s.courage, COURAGE_MAX, "🟨")
     prog = _meter(s.progress // 10, 10, "🟦")
-    men = "🟪" * s.menace + ("  ⚠️ CLOSE" if s.nightmare_near else "")
-    carry = ", ".join(s.inventory) if s.inventory else "—"
-    tiger = MOOD_FACE[s.mood]
-    roll = ""
-    if engine.last_outcome is not None:
-        o = engine.last_outcome
-        face = {"success": "success", "partial": "partial", "fail": "fail"}[o.result]
-        roll = (f"\n\n**🎲 Last roll:** {o.roll} vs fail ≤{o.fail_threshold} "
-                f"→ **{face}** ({o.tier})")
-    end = ""
+    cour = _meter(s.courage, COURAGE_MAX, "🟨")
+    parts = [
+        f"**🎯 {s.mission}**",
+        f"🩵 **Lucidity** {luc} `{s.lucidity}/{LUCIDITY_START}`",
+        f"🚀 **Progress** {prog} `{s.progress}%`",
+        f"{MOOD_FACE[s.mood]} **Hobbes** {cour} *{MOOD_PHRASE[s.mood]}*",
+    ]
+    if s.nightmare_near:
+        parts.append("👁️ **The Nightmare is close — flee or face it.**")
     if s.complete:
-        end = "\n\n✨ **YOU WAKE WITH THE PRIZE.**"
+        parts.append("✨ **You wake with the prize.**")
     elif s.lost:
-        end = "\n\n💤 **LOST IN THE DREAM.**"
-    return (f"### {s.emoji} {s.env_name}\n"
-            f"**🎯 Quest:** {s.mission}\n\n"
-            f"**Where:** {s.location}\n\n"
-            f"**🩵 Lucidity:** {luc} {s.lucidity}/{LUCIDITY_START}\n\n"
-            f"**🚀 Progress to goal:** {prog} {s.progress}%\n\n"
-            f"**{tiger} Hobbes** — *{MOOD_PHRASE[s.mood]}*\n\n{cour} {s.courage}/{COURAGE_MAX}\n\n"
-            f"**👁 Menace:** {men or '—'}\n\n"
-            f"**Carrying:** {carry}  •  **Turn:** {s.turn}  •  **Seed:** `{s.seed}`"
-            f"{roll}{end}")
+        parts.append("💤 **Lost in the dream.**")
+    parts.append(f"<sub>📍 {s.location} · turn {s.turn} · seed `{s.seed}`</sub>")
+    return "\n\n".join(parts)
 
 
 def card_md() -> str:
@@ -243,10 +235,7 @@ def begin(env_id, seed, history):
     engine.start(env_id, seed=(seed or "dream").strip())
     env = ENVIRONMENTS[env_id]
     history = [{"role": "assistant", "content": f"{env.emoji} *{env.opening}*"},
-               {"role": "assistant", "content": f"🎯 **Your quest:** {env.mission}"},
-               {"role": "assistant",
-                "content": "🎲 **Your move** — pick a gambit below (riskier = bigger "
-                            "reward toward the goal, bigger chance to fail), or type your own action."}]
+               {"role": "assistant", "content": f"🎯 **Quest:** {env.mission}"}]
     # Show the world's hero image + three gambit options INSTANTLY, so the world is
     # never empty and you always know what to do. The live narration, Hobbes' own
     # creative labels, and the per-beat image all layer in over the next few seconds.
@@ -317,34 +306,22 @@ h1 { letter-spacing: .5px; text-shadow: 0 2px 24px rgba(124,92,255,.5); }
          background-size: 200% 100%; animation: shimmer 3.5s ease-in-out infinite;}
 @keyframes shimmer { 0% {background-position: 200% 0;} 100% {background-position: -200% 0;} }
 .gr-button-primary { box-shadow: 0 6px 24px rgba(124,92,255,.4); }
-/* fleet banner — makes the multi-model thesis legible at a glance */
-#fleet {border: 1px solid rgba(124,92,255,.35); border-radius: 10px;
-        padding: 4px 14px; margin: 2px 0; font-size: .9em;
-        background: rgba(124,92,255,.07);}
+/* fleet line — a single subtle credit strip, not a competing banner */
+#fleet {padding: 2px 8px; margin: -4px 0 2px; opacity: .72; text-align: center;}
+#fleet sub {font-size: .82em;}
 footer {visibility: hidden;}
 """
 
 with gr.Blocks(title="DAYDREAM") as demo:
     gr.Markdown(
-        "# 🌙 DAYDREAM — *Press Your Luck, Keep Your Tiger*\n"
-        "Take **gambits** through a dream a fleet of small models is dreaming for you. "
-        "Survive on **lucidity**, climb to the prize — and watch **Hobbes** grow brave "
-        "because of the bets you take together. *Small models, big dreams.*"
+        "# 🌙 DAYDREAM\n"
+        "*A dream you **play** — chase the quest, keep your tiger brave, press your luck.*"
     )
     gr.Markdown(
-        "🤖 **The fleet dreaming this** &nbsp; "
-        "🌌 Dreamweaver · 👁 Nightmare · 🐯 Hobbes &nbsp;—&nbsp; *Qwen3-30B-A3B "
-        "(MoE, only 3B active/token)* &nbsp;•&nbsp; "
-        "🗺 Keeper &nbsp;—&nbsp; *MiniCPM-1B* &nbsp;•&nbsp; "
-        "🎨 Painter &nbsp;—&nbsp; *FLUX* &nbsp;•&nbsp; **every model ≤32B**",
+        "<sub>🤖 dreamed by a fleet: 🌌👁🐯 **Qwen3-30B-A3B** (MoE · 3B active) · "
+        "🗺 **MiniCPM-1B** · 🎨 **FLUX** — every model ≤32B &nbsp;·&nbsp; "
+        "⏳ first turn wakes the GPUs (~1–2 min), then ~5s each</sub>",
         elem_id="fleet",
-    )
-    gr.Markdown(
-        "> ⏳ **First turn waking the dream?** The models run on serverless GPUs that "
-        "sleep when idle, so the **very first turn can take 1–2 min** to wake. "
-        "After that, every turn is **~5 seconds** — narration streams instantly. "
-        "Hang tight — the dream is forming. ✨",
-        elem_id="warmup",
     )
     with gr.Row():
         with gr.Column(scale=3):
@@ -352,16 +329,21 @@ with gr.Blocks(title="DAYDREAM") as demo:
             with gr.Row():
                 btns = [gr.Button(visible=False, size="sm") for _ in range(NBTN)]
             with gr.Row():
-                intent = gr.Textbox(placeholder="…or say what you do (a bold gamble)",
-                                    scale=8, show_label=False, autofocus=True)
+                intent = gr.Textbox(
+                    placeholder="…or type your own move — e.g. “dig where the sand hums” "
+                                "or “follow the strange tracks” (counts as a bold gamble)",
+                    scale=8, show_label=False, autofocus=True)
                 go = gr.Button("Do it", variant="primary", scale=1)
             card = gr.Markdown(visible=False, elem_id="card")
             with gr.Row():
                 printbtn = gr.Button("📸 Freeze the dream card", visible=False)
                 dlbtn = gr.DownloadButton("📥 Download my story", size="sm")
         with gr.Column(scale=2):
-            dream_img = gr.Image(label="🌌 The dream", height=380, visible=False,
-                                 interactive=False, elem_id="dream", show_label=False)
+            # Show the chosen world's hero image immediately (and on selection) so the
+            # frame is never empty — even while the first turn cold-starts.
+            dream_img = gr.Image(value=_world_hero("candy_desert"), label="🌌 The dream",
+                                 height=380, visible=True, interactive=False,
+                                 elem_id="dream", show_label=False)
             world = gr.Dropdown(ENV_CHOICES, value="candy_desert", label="World")
             seed = gr.Textbox(value="abc123", label="Seed (shareable)")
             start = gr.Button("Begin the dream 🌙", variant="primary")
@@ -369,6 +351,11 @@ with gr.Blocks(title="DAYDREAM") as demo:
             if HAS_MUSIC:  # looping ambient track; play once, it loops the session
                 gr.Audio(MUSIC_PATH, loop=True, autoplay=False,
                          label="🎵 Dream music", elem_id="music")
+
+    # Show the picked world's hero image immediately on selection (before Begin),
+    # so the frame previews the world and is never empty.
+    world.change(lambda env_id: gr.update(value=_world_hero(env_id), visible=True),
+                 world, dream_img)
 
     outs = [chat, panel, *btns, intent, card, printbtn, dream_img]
     start.click(begin, [world, seed, chat], outs)
