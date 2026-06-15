@@ -20,7 +20,8 @@ import modal
 MODEL = os.environ.get("FLUX_MODEL", "black-forest-labs/FLUX.1-schnell")
 GPU = os.environ.get("FLUX_GPU", "A100-40GB")
 STEPS = int(os.environ.get("FLUX_STEPS", "2"))      # schnell is guidance-distilled; 2 steps is the speed/quality sweet spot
-SIZE = int(os.environ.get("FLUX_SIZE", "640"))      # square; smaller = faster (640 ≈ 2x faster than 768 in pixels)
+SIZE = int(os.environ.get("FLUX_SIZE", "512"))      # square; 512 is fast + detailed (UI shows ~380px) and the smallest sharp size
+JPEG_Q = int(os.environ.get("FLUX_JPEG_Q", "88"))   # JPEG output: ~6-10x smaller than PNG to ship over the wire, detail intact
 # FLUX bf16 (~34GB across transformer+T5+VAE) is tight on 40GB, so offload module
 # weights to CPU and stream them to the GPU per step. Adds a little latency but
 # fits comfortably; set FLUX_OFFLOAD=0 on an 80GB card for full-speed (~2s).
@@ -114,12 +115,12 @@ class Flux:
             generator=gen,
         ).images[0]
         dt = time.time() - t0
-        # Per-image timing in the logs (`modal app logs small-hack-flux`) so we can
-        # SEE generation cost, not guess it from client round-trips.
-        print(f"[FLUX] image in {dt:.2f}s ({STEPS} steps @ {SIZE}px)", flush=True)
 
         buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        # Also surface timing to the caller for client-side logging/HUD.
-        return Response(content=buf.getvalue(), media_type="image/png",
-                        headers={"X-Gen-Seconds": f"{dt:.2f}"})
+        img.save(buf, format="JPEG", quality=JPEG_Q)  # small file for fast transport to the UI
+        kb = len(buf.getvalue()) / 1024
+        # Per-image timing + file size in the logs (`modal app logs small-hack-flux`)
+        # so we SEE generation cost and payload weight, not guess them.
+        print(f"[FLUX] image in {dt:.2f}s ({STEPS} steps @ {SIZE}px) | {kb:.0f}KB JPEG", flush=True)
+        return Response(content=buf.getvalue(), media_type="image/jpeg",
+                        headers={"X-Gen-Seconds": f"{dt:.2f}", "X-Size-KB": f"{kb:.0f}"})

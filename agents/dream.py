@@ -93,11 +93,11 @@ class DreamEngine:
     # in tokens, and --enforce-eager decode is unhurried on the 27B). Each cap is
     # sized to the job: 2-4 sentences of prose, one ominous line, small JSON blobs.
     dreamweaver: Agent = field(default_factory=lambda: Agent(
-        "Dreamweaver", "specialist", DREAMWEAVER_SYS, LLMConfig(0.95, 130)))
+        "Dreamweaver", "specialist", DREAMWEAVER_SYS, LLMConfig(0.95, 110)))
     nightmare: Agent = field(default_factory=lambda: Agent(
-        "Nightmare", "specialist", NIGHTMARE_SYS, LLMConfig(1.0, 45)))
+        "Nightmare", "specialist", NIGHTMARE_SYS, LLMConfig(1.0, 42)))
     hobbes: Agent = field(default_factory=lambda: Agent(
-        "Hobbes", "specialist", HOBBES_SYS, LLMConfig(0.85, 100)))
+        "Hobbes", "specialist", HOBBES_SYS, LLMConfig(0.85, 85)))
     # Keeper is presentational memory, not game math — give it a SHORT retry budget
     # so a cold/slow router degrades fast (state simply doesn't update this turn)
     # instead of holding the turn at the keeper_job join. The narrator keeps the
