@@ -36,8 +36,6 @@ you take *together*. Code rolls the dice; the little models supply the soul.
 - **Sponsor prizes:** **OpenBMB / Best MiniCPM** (MiniCPM5-1B is our Keeper) · **Modal / Best Use** (4 services + a cost-guardian).
 - **Bonus badges:** **Best Agent** (a coordinated multi-agent fleet) · **Off Brand** (custom dream-deck UI + live generated visuals) · **Best Demo**.
 
----
-
 ## ✨ What makes it different
 
 1. **A fleet, not a chatbot.** Four agents — 🌌 Dreamweaver, 👁 Nightmare, 🐯 Hobbes, 🗺 Keeper — each a small model with one job, coordinated per turn.
@@ -47,7 +45,66 @@ you take *together*. Code rolls the dice; the little models supply the soul.
 5. **Engineered for real Modal deployment.** Multi-backend (vLLM + llama.cpp + FLUX) plus a **cloud cost-guardian** we built after a runaway GPU lesson — scale-to-zero, hard container caps, and a lease-based dead-man's-switch.
 6. **Deterministic & shareable.** Same dream seed replays the same dice *and* the same images → *"beat my run, seed `abc123`."*
 
+---
+
+## 🧠 The Fleet Architecture
+
+DAYDREAM uses a **Distributed Fleet Architecture** to achieve coherence on models as small as 1B parameters.
+
+### Agent Topology
+```mermaid
+graph TD
+    subgraph "The Orchestrator (Python)"
+        RES[Seeded Resolver]
+        WS[(WorldState)]
+    end
+
+    subgraph "The Fleet (Small Models ≤ 32B)"
+        DW[[🌌 Dreamweaver<br/>Qwen3-30B-A3B MoE]]
+        NM[[👁 Nightmare<br/>Qwen3-30B-A3B MoE]]
+        HB[[🐯 Hobbes<br/>Qwen3-30B-A3B MoE]]
+        KP[[🗺 Keeper<br/>MiniCPM-1B]]
+    end
+
+    RES -->|Verdict| DW
+    WS -->|Context Slice| DW
+    WS -->|Context Slice| HB
+    DW -->|Scene Context| NM
+    DW -->|Scene Context| KP
+    KP -->|State Patch| WS
+    DW -.-> IMG[🎨 FLUX Vision]
+
+    style DW fill:#1b1640,stroke:#7c5cff,color:#fff
+    style KP fill:#241a4d,stroke:#9d7bff,color:#fff
+    style RES fill:#0b0a1c,stroke:#ff5c5c,color:#fff
+```
+
+### Turn Orchestration (Parallel Execution)
+```mermaid
+sequenceDiagram
+    participant P as Player
+    participant C as Code (Resolver)
+    participant D as Dreamweaver (30B-A3B MoE)
+    participant K as Keeper (1B)
+    participant V as Vision (FLUX)
+
+    P->>C: Picks "Reckless" Gambit
+    C->>C: Roll Dice (Seeded)
+    C->>D: Handoff Verdict + State
+    par Streaming Narration
+        D-->>P: Streams prose...
+    and Parallel Update
+        C->>K: Patch World State
+        C->>V: Generate Image
+    end
+    K-->>C: Update Inventory/Location
+    V-->>P: Display Image (Lands with Prose)
+```
+
+---
+
 ## 🎮 How it plays
+
 1. Pick a world (Candy Desert, Sunken City, Rain Street, Red Planet, Thousand Token Wood) and a seed.
 2. Take a **gambit** — 🟢 safe / 🟡 bold / 🔴 reckless — or type your own intent (a bold gamble).
 3. The **Dreamweaver** narrates the outcome the dice already decided; the **Nightmare** presses when menace climbs; **Hobbes** reacts in his current mood and offers the next three gambits; the **Keeper** updates world-state.
@@ -58,9 +115,9 @@ you take *together*. Code rolls the dice; the little models supply the soul.
 
 | Agent | Role | Backend (≤32B each) | Job |
 |---|---|---|---|
-| 🌌 Dreamweaver | specialist | Modal vLLM · Qwen3.5-27B-FP8 | narrate the pre-decided outcome |
-| 👁 Nightmare | specialist | Modal vLLM · Qwen3.5-27B-FP8 | press the dread when menace is high |
-| 🐯 Hobbes | specialist | Modal vLLM · Qwen3.5-27B-FP8 | companion; voice keyed to COURAGE; offer gambits |
+| 🌌 Dreamweaver | specialist | Modal vLLM · Qwen3-30B-A3B (MoE, 3B active) | narrate the pre-decided outcome |
+| 👁 Nightmare | specialist | Modal vLLM · Qwen3-30B-A3B (MoE, 3B active) | press the dread when menace is high |
+| 🐯 Hobbes | specialist | Modal vLLM · Qwen3-30B-A3B (MoE, 3B active) | companion; voice keyed to COURAGE; offer gambits |
 | 🗺 Keeper | router | Modal llama.cpp · **MiniCPM5-1B** | structured world-state (location, items, memory) |
 | 🎨 dream image | vision | Modal · FLUX.1-schnell | paint each beat, in parallel under the narration |
 
