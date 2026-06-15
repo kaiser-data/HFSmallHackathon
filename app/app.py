@@ -105,9 +105,10 @@ def state_md() -> str:
     elif s.lost:
         end = "\n\n💤 **LOST IN THE DREAM.**"
     return (f"### {s.emoji} {s.env_name}\n"
+            f"**🎯 Quest:** {s.mission}\n\n"
             f"**Where:** {s.location}\n\n"
             f"**🩵 Lucidity:** {luc} {s.lucidity}/{LUCIDITY_START}\n\n"
-            f"**🎯 Progress:** {prog} {s.progress}%\n\n"
+            f"**🚀 Progress to goal:** {prog} {s.progress}%\n\n"
             f"**{tiger} Hobbes** — *{MOOD_PHRASE[s.mood]}*\n\n{cour} {s.courage}/{COURAGE_MAX}\n\n"
             f"**👁 Menace:** {men or '—'}\n\n"
             f"**Carrying:** {carry}  •  **Turn:** {s.turn}  •  **Seed:** `{s.seed}`"
@@ -242,9 +243,10 @@ def begin(env_id, seed, history):
     engine.start(env_id, seed=(seed or "dream").strip())
     env = ENVIRONMENTS[env_id]
     history = [{"role": "assistant", "content": f"{env.emoji} *{env.opening}*"},
+               {"role": "assistant", "content": f"🎯 **Your quest:** {env.mission}"},
                {"role": "assistant",
                 "content": "🎲 **Your move** — pick a gambit below (riskier = bigger "
-                            "reward, bigger chance to fail), or type your own action."}]
+                            "reward toward the goal, bigger chance to fail), or type your own action."}]
     # Show the world's hero image + three gambit options INSTANTLY, so the world is
     # never empty and you always know what to do. The live narration, Hobbes' own
     # creative labels, and the per-beat image all layer in over the next few seconds.

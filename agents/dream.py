@@ -39,10 +39,13 @@ DEFAULT_LABELS = {  # fallback when Hobbes' JSON doesn't parse (loose_json -> {}
 TYPED_TIER = "bold"  # free-text intent is a real gamble, not free wandering
 
 DREAMWEAVER_SYS = (
-    "You are the Dreamweaver, narrator of a lucid dream. You are told the dreamer's "
-    "action and whether it SUCCEEDED, partly worked, or FAILED — honor that verdict. "
-    "Narrate the result in 2-4 vivid, concrete sentences. Dream-logic is welcome, but "
-    "respect the world-state. Never ask questions — show what happens. Second person."
+    "You are the Dreamweaver, weaving ONE coherent dream-story that moves toward the "
+    "dreamer's GOAL (the MISSION in the world-state). You are told the action and whether "
+    "it SUCCEEDED, partly worked, or FAILED — honor that verdict: on success move the story "
+    "a clear step CLOSER to the goal; on failure set it back or deepen the danger. Build on "
+    "what came before and reflect how close they are (the progress %). Narrate in 2-3 vivid, "
+    "concrete sentences. Dream-logic is welcome but stay consistent with the world-state. "
+    "Never ask questions — show what happens. Second person."
 )
 NIGHTMARE_SYS = (
     "You are the Nightmare — the dread closing in on the dream. In ONE short, ominous "
@@ -53,9 +56,10 @@ HOBBES_SYS = (
     "You are Hobbes — the dreamer's companion, a stuffed tiger come to life. React to the "
     "scene in ONE short line of dialogue, then name THREE things the dreamer could do next. "
     "CRUCIAL: each option must build directly on what JUST happened and the concrete things "
-    "present in THIS scene — the specific objects, places, and creatures named in it. They are "
-    "the dreamer's next steps in an unfolding story, never generic 'look around / go forward' "
-    "filler. Escalate cautious→daring (1=safe, 2=bold, 3=reckless). "
+    "present in THIS scene — the specific objects, places, and creatures named in it — and be "
+    "a real way to pursue the dreamer's GOAL (the mission). They are the next steps in an "
+    "unfolding story, never generic 'look around / go forward' filler. Escalate cautious→daring "
+    "(1=safe, 2=bold, 3=reckless). "
     'Reply ONLY as JSON: {"reaction":"<one line>","choices":["<safe>","<bold>","<reckless>"]}. '
     "Each choice ≤6 words, imperative, vivid, and specific to this exact moment."
 )
@@ -141,11 +145,23 @@ class DreamEngine:
         verdict = {"success": "SUCCEEDED", "partial": "partly worked",
                    "fail": "FAILED"}.get(out.result, "happens") if out else "happens"
 
-        # 2) Dreamweaver narrates the pre-decided outcome
+        # Will this beat END the dream? Pre-computing it lets the Dreamweaver narrate
+        # a real CLIMAX — reaching the goal, or the dream collapsing — instead of a
+        # flat beat that the code then silently turns into a win/loss.
+        climax = ""
+        if out:
+            if s.progress + out.progress_reward >= 100:
+                climax = (" THIS IS THE CLIMAX: the dreamer finally reaches the goal and "
+                          "wakes with the prize. Narrate the triumphant resolution of the quest.")
+            elif s.lucidity - out.lucidity_cost <= 0:
+                climax = (" THIS IS THE END: lucidity runs out and the dream dissolves before "
+                          "the goal. Narrate a poignant, fading collapse.")
+
+        # 2) Dreamweaver narrates the pre-decided outcome — as a story beat toward the goal
         scene = ""
         for d in self.dreamweaver.stream(
-                f"{self._ctx()}\nThe dreamer: {intent}\nThis action {verdict}. "
-                f"Narrate the result."):
+                f"{self._ctx()}\nThe dreamer: {intent}\nThis action {verdict}.{climax}\n"
+                f"Move the story toward the goal and narrate this beat."):
             scene += d
             yield "Dreamweaver", d
 
