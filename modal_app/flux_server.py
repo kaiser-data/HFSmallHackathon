@@ -36,7 +36,17 @@ image = (
         "sentencepiece>=0.2", "protobuf>=4.25",
         "torch>=2.4", "huggingface_hub[hf_transfer]>=0.24", "fastapi[standard]",
     )
-    .env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
+    .env({
+        "HF_HUB_ENABLE_HF_TRANSFER": "1",
+        # generate() reads these at RUNTIME inside the container, where the local
+        # .env doesn't exist — so BAKE the chosen values here (this .env() runs
+        # client-side at deploy). Without this, FLUX silently used the in-file
+        # defaults (was rendering 768px/4-step instead of the faster 640/2-step).
+        "FLUX_MODEL": MODEL,
+        "FLUX_STEPS": str(STEPS),
+        "FLUX_SIZE": str(SIZE),
+        "FLUX_OFFLOAD": "1" if OFFLOAD else "0",
+    })
 )
 
 hf_cache = modal.Volume.from_name("hf-cache", create_if_missing=True)

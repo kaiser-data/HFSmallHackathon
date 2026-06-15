@@ -163,13 +163,19 @@ def _stream_turn(intent, tier, history):
         history[-1]["content"] += delta
         yield history, gr.update(), *_hidden_btns(), "", *_card_updates(), gr.update()
 
-    # The picture has painted under the prose; settle it now (usually already done).
-    img_up = gr.update()
+    # Show the gambit buttons the INSTANT narration + Hobbes are done — don't make
+    # the player wait on the slower image. (Buttons in ~8s, not ~17s.)
+    yield history, state_md(), *_btn_updates(), "", *_card_updates(), gr.update()
+
+    # Then let the dream image pop in when it's ready (often already painted under
+    # the prose; at worst it lands a few seconds after the buttons).
     if img_future is not None:
-        pic = img_future.result()
+        try:
+            pic = img_future.result(timeout=120)
+        except Exception:
+            pic = None
         if pic is not None:
-            img_up = gr.update(value=pic, visible=True)
-    yield history, state_md(), *_btn_updates(), "", *_card_updates(), img_up
+            yield history, gr.update(), *_btn_updates(), "", *_card_updates(), gr.update(value=pic, visible=True)
 
 
 def begin(env_id, seed, history):
