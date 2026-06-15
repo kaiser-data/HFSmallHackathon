@@ -182,10 +182,15 @@ def _card_updates():
 
 
 def _die_bubble() -> dict:
+    """Plain-language dice: roll high to win. Shows the bands so it's learnable."""
     o = engine.last_outcome
-    face = {"success": "✨ SUCCESS", "partial": "〰 PARTIAL", "fail": "💥 FAIL"}[o.result]
+    f = o.fail_threshold
+    line = {"success": "✨ **Success!**", "partial": "〰 **Partial** — it half-works",
+            "fail": "💥 **Failed**"}[o.result]
     return {"role": "assistant",
-            "content": f"🎲 **{o.roll}** vs fail ≤{o.fail_threshold} → {face}  *({o.tier})*"}
+            "content": (f"🎲 You rolled **{o.roll}** / 100 — {line}  \n"
+                        f"<sub>higher is better · 1–{f} fails · {f+1}–{f+20} partial · "
+                        f"{f+21}+ wins · ({o.tier} gambit)</sub>")}
 
 
 def _stream_turn(intent, tier, history):

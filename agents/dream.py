@@ -21,12 +21,25 @@ Per turn:
 """
 from __future__ import annotations
 import re
+import random
 import concurrent.futures
 from dataclasses import dataclass, field
 
 from .base import Agent, LLMConfig
 from .world import ENVIRONMENTS, WorldState, TIERS, courage_tier, COURAGE_MAX
 from .stories import arc_of, beat_for
+
+# Dream-surprises: the dream is allowed to *change* mid-story. Occasionally (seeded,
+# so "same seed = same dream" still holds) the Dreamweaver is told to fold in a small
+# surreal swerve — a new thing happening — so a run never feels on-rails. These bend
+# the scene, never the goal: the quest and the dice math are untouched.
+SURPRISES = [
+    "Surreal swerve: something the dreamer was carrying (or the ground itself) transforms into something unexpected — weave it in naturally.",
+    "Surreal swerve: a strange small creature or figure appears for this beat, reacts to the dreamer, then is gone.",
+    "Surreal swerve: the scene briefly shifts register — gravity, scale, color, or time goes dreamlike-wrong for a moment, then settles.",
+    "Surreal swerve: an object from earlier in the dream returns, changed, and means something new now.",
+    "Surreal swerve: the dreamer glimpses, for one heartbeat, a hint of the hidden truth at this world's heart — then it's gone.",
+]
 from .resolver import resolve, apply, Outcome
 
 # Fixed escalation order the model's three labels are zipped onto. CODE owns the
@@ -193,9 +206,16 @@ class DreamEngine:
         proj_progress = min(100, s.progress + (out.progress_reward if out else 0))
         beat = self._beat(proj_progress)
         story = f"\nSTORY BEAT (narrate toward this, don't quote it): {beat}" if beat else ""
+        # Roughly 1 in 3 mid-story turns gets a surprise swerve (seeded for replay).
+        # Not on the arrival beat or the climax — those carry their own weight.
+        surprise = ""
+        if out and not climax:
+            rng = random.Random(f"{s.seed}:surprise:{s.turn}")
+            if rng.random() < 0.34:
+                surprise = "\n" + rng.choice(SURPRISES)
         scene = ""
         for d in self.dreamweaver.stream(
-                f"{self._ctx()}\nThe dreamer: {intent}\nThis action {verdict}.{climax}{story}\n"
+                f"{self._ctx()}\nThe dreamer: {intent}\nThis action {verdict}.{climax}{story}{surprise}\n"
                 f"Advance the story toward the beat and narrate what happens now."):
             scene += d
             yield "Dreamweaver", d
