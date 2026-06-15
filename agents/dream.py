@@ -25,7 +25,7 @@ import concurrent.futures
 from dataclasses import dataclass, field
 
 from .base import Agent, LLMConfig
-from .world import ENVIRONMENTS, WorldState, TIERS, courage_tier
+from .world import ENVIRONMENTS, WorldState, TIERS, courage_tier, COURAGE_MAX
 from .resolver import resolve, apply, Outcome
 
 # Fixed escalation order the model's three labels are zipped onto. CODE owns the
@@ -112,7 +112,7 @@ class DreamEngine:
     # Persistent pool for fire-and-forget background work (the Keeper's state write).
     # Not part of equality/repr.
     _pool: concurrent.futures.ThreadPoolExecutor = field(
-        default_factory=lambda: concurrent.futures.ThreadPoolExecutor(max_workers=2),
+        default_factory=lambda: concurrent.futures.ThreadPoolExecutor(max_workers=3),
         repr=False, compare=False)
 
     # --- lifecycle ---
@@ -157,7 +157,27 @@ class DreamEngine:
                 climax = (" THIS IS THE END: lucidity runs out and the dream dissolves before "
                           "the goal. Narrate a poignant, fading collapse.")
 
-        # 2) Dreamweaver narrates the pre-decided outcome — as a story beat toward the goal
+        # Will this beat END the dream? (drives both the climax line and whether we
+        # ask Hobbes for new gambits or for a farewell.)
+        will_end = bool(out) and (
+            s.progress + out.progress_reward >= 100 or s.lucidity - out.lucidity_cost <= 0)
+
+        # PARALLELISM (the realtime win): Hobbes reacts to the SITUATION — the action,
+        # the verdict, his projected mood — not to the exact prose. So kick him off
+        # NOW, concurrently with the Dreamweaver. vLLM's continuous batching runs both
+        # on the same warm GPU at once, so a turn is ~one model-call deep instead of
+        # two (~2x faster) — no extra machines needed.
+        hobbes_future = None
+        if not will_end:
+            proj_courage = min(COURAGE_MAX, s.courage + (out.courage_gain if out else 0))
+            proj_mood = courage_tier(proj_courage)
+            hobbes_future = self._pool.submit(
+                self.hobbes.json,
+                f"{self._ctx()}\nYOUR MOOD: {MOOD_NOTE[proj_mood]}\n"
+                f"The dreamer just chose: {intent}\nThat action {verdict}.\n"
+                f"React in one line, then offer three gambits that pursue the goal.")
+
+        # 2) Dreamweaver narrates the pre-decided outcome — concurrent with Hobbes
         scene = ""
         for d in self.dreamweaver.stream(
                 f"{self._ctx()}\nThe dreamer: {intent}\nThis action {verdict}.{climax}\n"
@@ -178,30 +198,23 @@ class DreamEngine:
                 yield "Nightmare", d
             scene += " " + twist
 
-        # 6) Keeper (router) writes presentational state (location/items). It is NOT
-        # game math, so FIRE IT AND DON'T WAIT — a cold/slow llama.cpp must never
-        # delay the gambit buttons. It runs on the persistent pool and lands in the
-        # background (location may lag a turn at worst). The context is snapshotted
-        # so the background write can't race this turn's reads.
-        ctx = self._ctx()
-        self._pool.submit(self._update, ctx, intent, scene)
+        # 6) Keeper writes presentational state in the background (fire-and-forget) —
+        # never on the turn's critical path.
+        self._pool.submit(self._update, self._ctx(), intent, scene)
 
-        # 5) Hobbes reacts (voice keyed to courage) + offers three gambits. This is
-        # the LAST thing on the turn's critical path → buttons appear right after.
-        if not s.over:
-            h = self.hobbes.json(
-                f"{ctx}\nYOUR MOOD: {MOOD_NOTE[s.mood]}\n"
-                f"The dreamer did: {intent}\nScene: {scene}\n"
-                f"React and offer three gambits.")
+        # 5) Hobbes — already computed IN PARALLEL with the narration above, so this
+        # is ~instant by the time the prose finishes.
+        if s.over:
+            self.gambits = []
+            yield "Hobbes", self.farewell()
+        else:
+            h = hobbes_future.result() if hobbes_future else {}
             reaction = str(h.get("reaction") or "...").strip()
             ch = h.get("choices")
             labels = ([c.strip() for c in ch if isinstance(c, str) and c.strip()][:3]
                       if isinstance(ch, list) else [])
             self.gambits = self._make_gambits(labels)
             yield "Hobbes", reaction
-        else:
-            self.gambits = []
-            yield "Hobbes", self.farewell()
 
     def _make_gambits(self, labels: list[str]) -> list[tuple[str, str]]:
         """Zip the model's words onto code-fixed tiers; fall back per missing slot."""
