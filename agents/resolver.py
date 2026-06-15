@@ -50,30 +50,43 @@ def resolve(tier: str, seed: str, turn: int) -> Outcome:
     else:
         result = "success"
 
-    # Reward math, all code-owned. Failing already wastes the turn's lucidity for
-    # zero progress and raises menace — penalty enough; no extra lucidity bite, so
-    # the high-risk line stays a gamble rather than a death sentence.
+    # Reward math, all code-owned. KEY DESIGN: the story ALWAYS proceeds toward the
+    # goal — every gambit gives *some* progress, so the dream never stalls. The dice
+    # decides the COST, not whether anything happens:
+    #   success → big leap forward, the Nightmare eases, Hobbes grows braver
+    #   partial → solid step forward, small cost
+    #   fail    → you still stumble forward, BUT the Nightmare surges (extra lucidity
+    #             drain + menace) — that's the real, legible risk of a bold bet.
+    reward = int(spec["progress_reward"])
+    cost = int(spec["lucidity_cost"])
     if result == "fail":
         return Outcome(tier, result, roll, fail_threshold,
-                       lucidity_cost=int(spec["lucidity_cost"]),
-                       progress_reward=0,
+                       lucidity_cost=cost + 1,                 # the dream destabilizes
+                       progress_reward=max(3, reward // 3),    # still inch forward
                        courage_gain=0,
-                       menace_delta=int(spec["menace_delta"]) + 1)
+                       menace_delta=int(spec["menace_delta"]) + 2)  # Nightmare surges
     if result == "partial":
         return Outcome(tier, result, roll, fail_threshold,
-                       lucidity_cost=int(spec["lucidity_cost"]),
-                       progress_reward=int(spec["progress_reward"]) // 2,
+                       lucidity_cost=cost,
+                       progress_reward=(reward * 2) // 3,
                        courage_gain=0,
                        menace_delta=int(spec["menace_delta"]))
     return Outcome(tier, result, roll, fail_threshold,
-                   lucidity_cost=int(spec["lucidity_cost"]),
-                   progress_reward=int(spec["progress_reward"]),
+                   lucidity_cost=cost,
+                   progress_reward=reward,
                    courage_gain=int(spec["courage_gain"]),
                    menace_delta=max(0, int(spec["menace_delta"]) - 1))  # a win eases pressure
 
 
 def apply(state: WorldState, out: Outcome) -> None:
-    """Mutate world-state by an Outcome — the ONLY place gamble math touches state."""
+    """Mutate world-state by an Outcome — the ONLY place gamble math touches state.
+
+    One clean tension: PROGRESS climbs to 100 (wake with the prize) while LUCIDITY
+    drains to 0 (lost in the dream). Every gambit advances progress; bolder gambits
+    leap further but cost more lucidity, and a fail costs extra. Menace is the
+    Nightmare's narrative pressure (drives the Nightmare beat), not a hidden drain —
+    so the only way to lose stays legible: run out of lucidity.
+    """
     state.lucidity = max(0, state.lucidity - out.lucidity_cost)
     state.progress = min(100, state.progress + out.progress_reward)
     state.courage = min(COURAGE_MAX, state.courage + out.courage_gain)

@@ -93,12 +93,14 @@ def state_md() -> str:
     cour = _meter(s.courage, COURAGE_MAX, "🟨")
     parts = [
         f"**🎯 {s.mission}**",
+        "<sub>🏁 *Race: fill Progress to wake with the prize — before Lucidity hits 0.*</sub>",
+        f"🚀 **Progress to goal** {prog} `{s.progress}%`",
         f"🩵 **Lucidity** {luc} `{s.lucidity}/{LUCIDITY_START}`",
-        f"🚀 **Progress** {prog} `{s.progress}%`",
         f"{MOOD_FACE[s.mood]} **Hobbes** {cour} *{MOOD_PHRASE[s.mood]}*",
     ]
-    if s.nightmare_near:
-        parts.append("👁️ **The Nightmare is close — flee or face it.**")
+    if s.menace:
+        parts.append(f"👁️ **Nightmare** {'🟪' * s.menace}"
+                     + ("  **— CLOSE! flee or face it**" if s.nightmare_near else ""))
     if s.complete:
         parts.append("✨ **You wake with the prize.**")
     elif s.lost:

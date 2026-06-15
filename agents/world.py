@@ -80,17 +80,20 @@ ENVIRONMENTS: dict[str, Environment] = {
 # Tuned for a tense-but-winnable ~3-min arc (8-12 turns). Each tier is a real
 # choice: safe is the patient grind (10/turn clears 100 well within a run),
 # reckless is a genuine gamble for speed — risky, not a death sentence.
+# Tuned so a balanced run lasts ~8-12 turns (long enough to live the 5-beat story
+# arc), reckless is a real gamble (fast but can lose), and safe is the patient,
+# low-drama grind. Progress always advances (see resolver); these set the pace.
 TIER_TABLE: dict[str, dict[str, int | float]] = {
-    "safe":     {"lucidity_cost": 1, "progress_reward": 10, "courage_gain": 0,
+    "safe":     {"lucidity_cost": 1, "progress_reward": 9, "courage_gain": 0,
                  "fail_chance": 0.05, "menace_delta": 0},
-    "bold":     {"lucidity_cost": 2, "progress_reward": 22, "courage_gain": 1,
+    "bold":     {"lucidity_cost": 2, "progress_reward": 15, "courage_gain": 1,
                  "fail_chance": 0.25, "menace_delta": 1},
-    "reckless": {"lucidity_cost": 3, "progress_reward": 40, "courage_gain": 2,
+    "reckless": {"lucidity_cost": 4, "progress_reward": 26, "courage_gain": 2,
                  "fail_chance": 0.40, "menace_delta": 1},
 }
 TIERS = ("safe", "bold", "reckless")
 
-LUCIDITY_START = 16
+LUCIDITY_START = 20
 MENACE_THRESHOLD = 5     # at/above this, the Nightmare forces a Flee-or-Face beat
 COURAGE_MAX = 6
 
