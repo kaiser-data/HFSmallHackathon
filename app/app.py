@@ -24,6 +24,17 @@ engine = DreamEngine()
 # Paint each dream beat off the main thread so the picture renders *under* the
 # narration (same overlap trick as the Keeper) — near-zero added latency per turn.
 _IMG_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+_CUR_IMG = None  # the in-flight image future — only the latest beat's image matters
+
+
+def _submit_image(state, intent, outcome):
+    """Start painting this beat; cancel any still-pending previous beat so a new
+    action always supersedes the old image instead of queueing behind it."""
+    global _CUR_IMG
+    if _CUR_IMG is not None:
+        _CUR_IMG.cancel()  # drops it if not yet started; a running one is ignored below
+    _CUR_IMG = _IMG_POOL.submit(dream_image, state, intent, outcome)
+    return _CUR_IMG
 
 # Ambient dream music: a static looping track played IN-BROWSER — zero backend,
 # zero latency, zero cold-start. Activates only if a (CC0/royalty-free) file is
@@ -34,10 +45,22 @@ MUSIC_PATH = str(_ASSETS / "dream-ambient.mp3")
 HAS_MUSIC = _os.path.exists(MUSIC_PATH)
 
 # Pre-generated world hero images shown the INSTANT you Begin — so the world is
-# never empty while the live per-beat image generates. Maps env_id -> path | None.
+# never empty while the live per-beat image generates. Returned as a PIL image
+# (not a path) so gr.Image embeds it directly — a local filepath would hit
+# Gradio's file-serving restrictions on the Space and render blank. Cached per id.
+_HERO_CACHE: dict = {}
 def _world_hero(env_id: str):
-    p = _ASSETS / "worlds" / f"{env_id}.png"
-    return str(p) if p.exists() else None
+    if env_id not in _HERO_CACHE:
+        p = _ASSETS / "worlds" / f"{env_id}.png"
+        img = None
+        if p.exists():
+            try:
+                from PIL import Image
+                img = Image.open(p).convert("RGB")
+            except Exception:
+                img = None
+        _HERO_CACHE[env_id] = img
+    return _HERO_CACHE[env_id]
 
 SPEAKER = {
     "Dreamweaver": "🌌 *Dreamweaver*",
@@ -186,8 +209,9 @@ def _stream_turn(intent, tier, history):
     for speaker, delta in engine.play(intent, tier):
         if img_future is None:
             # Outcome is decided by now (None on the arrival beat). Paint this beat in
-            # a thread so the picture renders *under* the prose and lands ~for free.
-            img_future = _IMG_POOL.submit(dream_image, engine.state, intent, engine.last_outcome)
+            # a thread (cancelling any stale previous beat) so the picture renders
+            # *under* the prose and a new action always supersedes the old image.
+            img_future = _submit_image(engine.state, intent, engine.last_outcome)
         if not die_shown and engine.last_outcome is not None:
             die_shown = True                   # reveal the seeded roll the instant it's decided
             history.append(_die_bubble())
@@ -203,13 +227,14 @@ def _stream_turn(intent, tier, history):
     yield history, state_md(), *_btn_updates(), "", *_card_updates(), gr.update()
 
     # Then let the dream image pop in when it's ready (often already painted under
-    # the prose; at worst it lands a few seconds after the buttons).
+    # the prose; warm FLUX is ~1s). Don't hang the turn on a slow/cold image, and
+    # only show it if THIS beat is still the latest request — a newer action wins.
     if img_future is not None:
         try:
-            pic = img_future.result(timeout=120)
+            pic = img_future.result(timeout=30)
         except Exception:
             pic = None
-        if pic is not None:
+        if pic is not None and img_future is _CUR_IMG:
             yield history, gr.update(), *_btn_updates(), "", *_card_updates(), gr.update(value=pic, visible=True)
 
 

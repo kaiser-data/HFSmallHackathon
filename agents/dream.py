@@ -51,10 +51,13 @@ NIGHTMARE_SYS = (
 )
 HOBBES_SYS = (
     "You are Hobbes — the dreamer's companion, a stuffed tiger come to life. React to the "
-    "scene in ONE short line of dialogue, then name THREE things the dreamer could do next, "
-    "escalating from cautious to daring (1=safe, 2=bold, 3=reckless). "
+    "scene in ONE short line of dialogue, then name THREE things the dreamer could do next. "
+    "CRUCIAL: each option must build directly on what JUST happened and the concrete things "
+    "present in THIS scene — the specific objects, places, and creatures named in it. They are "
+    "the dreamer's next steps in an unfolding story, never generic 'look around / go forward' "
+    "filler. Escalate cautious→daring (1=safe, 2=bold, 3=reckless). "
     'Reply ONLY as JSON: {"reaction":"<one line>","choices":["<safe>","<bold>","<reckless>"]}. '
-    "Each choice <=6 words, imperative, fun."
+    "Each choice ≤6 words, imperative, vivid, and specific to this exact moment."
 )
 KEEPER_SYS = (
     "You are the Keeper of narrative state. Given the scene and action, reply ONLY as "
